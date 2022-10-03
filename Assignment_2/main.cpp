@@ -55,4 +55,5 @@ int main()
     // 5 ramdom corordinated --> 5 probabilities of infection (5 random probability from 0-1 for infection)
     // eucleadian dis distance formula for finding distance
     // tsp --> find the minimum path --> distance and infection rate
+    // done
 }
