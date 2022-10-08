@@ -99,16 +99,14 @@ public class ThreadedTsp {
         if (memo[i][state] != null) return memo[i][state];
 
         double minCost = Double.POSITIVE_INFINITY;
-
         int index = -1;
         for (int next = 0; next < N; next++) {
 
             // Skip if the next node has already been visited.
             if ((state & (1 << next)) != 0) continue;
+
             int nextState = state | (1 << next);
-
             double newCost = distance[i][next] + tsp(next, nextState, memo, prev);
-
             if (newCost < minCost) {
                 minCost = newCost;
                 index = next;
@@ -170,14 +168,37 @@ public class ThreadedTsp {
         }
         System.out.println();
 
+        double maxDistance = -1;
+        double maxInfectionProbabilityMultiply = -1;
 
         int row = 0;
         for(double[] i: matrix){
             int column = 0;
             for(double[] j: matrix){
                 double distance = euclideanDistance(i[0], i[1], j[0], j[1]);
-//                System.out.println(distance);
-                distanceMatrix[row][column] = distance;
+                double infectionProbabilityMultiply = i[2]*j[2];
+
+                if (distance > maxDistance){
+                    maxDistance = distance;
+                }
+                if (infectionProbabilityMultiply > maxInfectionProbabilityMultiply){
+                    maxInfectionProbabilityMultiply = infectionProbabilityMultiply;
+                }
+                column ++;
+            }
+            row ++;
+        }
+
+
+        row = 0;
+        for(double[] i: matrix){
+            int column = 0;
+            for(double[] j: matrix){
+
+                double distance = euclideanDistance(i[0], i[1], j[0], j[1]);
+                double infectionProbabilityMultiply = i[2]*j[2];
+
+                distanceMatrix[row][column] = (0.5*distance)/maxDistance + (0.5*infectionProbabilityMultiply)/maxInfectionProbabilityMultiply;
                 column ++;
             }
             row ++;
