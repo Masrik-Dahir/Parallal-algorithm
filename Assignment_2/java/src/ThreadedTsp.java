@@ -14,46 +14,58 @@
 
 import java.text.DecimalFormat;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Random;
 
 public class ThreadedTsp {
 
     private static final DecimalFormat df = new DecimalFormat("0.00");
-    private final int N;
-    private final int START_NODE;
-    private final int FINISHED_STATE;
-
-    private double[][] distance;
-    private double minTourCost = Double.POSITIVE_INFINITY;
-
+    private static int N = 0;
+    private static int start = 0;
+    private static double[][] distance = new double[0][];
     private List<Integer> tour = new ArrayList<>();
+    private double minTourCost = Double.POSITIVE_INFINITY;
     private boolean ranSolver = false;
+
+    private static double newDistance;
+
+    static class Threading implements Runnable {
+        int next;
+        int subsetWithoutNext;
+
+        Double[][] memo;
+        int end;
+
+
+        public Threading(int next, int subsetWithoutNext, int end, Double[][] memo) {
+            // store parameter for later user
+            this.next = next;
+            this.subsetWithoutNext = subsetWithoutNext;
+            this.end = end;
+            this.memo = memo;
+        }
+
+        @Override
+        public void run() {
+            newDistance = memo[end][subsetWithoutNext] + distance[end][next];
+        }
+
+    }
 
     public ThreadedTsp(double[][] distance) {
         this(0, distance);
     }
 
-    public ThreadedTsp(int startNode, double[][] distance) {
-
-        this.distance = distance;
+    public ThreadedTsp(int start, double[][] distance) {
         N = distance.length;
-        START_NODE = startNode;
 
-        // Validate inputs.
-        if (N <= 2) throw new IllegalStateException("TSP on 0, 1 or 2 nodes doesn't make sense.");
-        if (N != distance[0].length)
-            throw new IllegalArgumentException("Matrix must be square (N x N)");
-        if (START_NODE < 0 || START_NODE >= N)
-            throw new IllegalArgumentException("Starting node must be: 0 <= startNode < N");
-        if (N > 32)
-            throw new IllegalArgumentException(
-                    "Matrix too large! A matrix that size for the DP TSP problem with a time complexity of"
-                            + "O(n^2*2^n) requires way too much computation for any modern home computer to handle");
+        if (N <= 2) throw new IllegalStateException("N <= 2 not yet supported.");
+        if (N != distance[0].length) throw new IllegalStateException("Matrix must be square (n x n)");
+        if (start < 0 || start >= N) throw new IllegalArgumentException("Invalid start node.");
 
-        // The finished state is when the finished state mask has all bits are set to
-        // one (meaning all the nodes have been visited).
-        FINISHED_STATE = (1 << N) - 1;
+        ThreadedTsp.start = start;
+        ThreadedTsp.distance = distance;
     }
 
     // Returns the optimal tour for the traveling salesman problem.
@@ -68,53 +80,116 @@ public class ThreadedTsp {
         return minTourCost;
     }
 
+
+    // Solves the traveling salesman problem and caches solution.
     public void solve() {
+        if (ranSolver) return;
 
-        // Run the solver
-        int state = 1 << START_NODE;
+        int END_STATE = (1 << N) - 1;
         Double[][] memo = new Double[N][1 << N];
-        Integer[][] prev = new Integer[N][1 << N];
-        minTourCost = tsp(START_NODE, state, memo, prev);
 
-        // Regenerate path
-        int index = START_NODE;
-        while (true) {
-            tour.add(index);
-            Integer nextIndex = prev[index][state];
-            if (nextIndex == null) break;
-            int nextState = state | (1 << nextIndex);
-            state = nextState;
-            index = nextIndex;
+        // Add all outgoing edges from the starting node to memo table.
+        for (int end = 0; end < N; end++) {
+            if (end == start) continue;
+            memo[end][(1 << start) | (1 << end)] = distance[start][end];
         }
-        tour.add(START_NODE);
-        ranSolver = true;
-    }
 
-    private double tsp(int i, int state, Double[][] memo, Integer[][] prev) {
+        for (int r = 3; r <= N; r++) {
+            for (int subset : combinations(r, N)) {
+                if (notIn(start, subset)) continue;
+                for (int next = 0; next < N; next++) {
+                    if (next == start || notIn(next, subset)) continue;
+                    int subsetWithoutNext = subset ^ (1 << next);
+                    double minDist = Double.POSITIVE_INFINITY;
 
-        // Done this tour. Return cost of going back to start node.
-        if (state == FINISHED_STATE) return distance[i][START_NODE];
+                    for (int end = 0; end < N; end++) {
+                        if (end == start || end == next || notIn(end, subset)) continue;
 
-        // Return cached answer if already computed.
-        if (memo[i][state] != null) return memo[i][state];
+                        Threading thread = new Threading(next, subsetWithoutNext, end, memo);
+                        new Thread(thread).start();
 
-        double minCost = Double.POSITIVE_INFINITY;
-        int index = -1;
-        for (int next = 0; next < N; next++) {
-
-            // Skip if the next node has already been visited.
-            if ((state & (1 << next)) != 0) continue;
-
-            int nextState = state | (1 << next);
-            double newCost = distance[i][next] + tsp(next, nextState, memo, prev);
-            if (newCost < minCost) {
-                minCost = newCost;
-                index = next;
+                        if (newDistance < minDist) {
+                            minDist = newDistance;
+                        }
+                    }
+                    memo[next][subset] = minDist;
+                }
             }
         }
 
-        prev[i][state] = index;
-        return memo[i][state] = minCost;
+        // Connect tour back to starting node and minimize cost.
+        for (int i = 0; i < N; i++) {
+            if (i == start) continue;
+            double tourCost = memo[i][END_STATE] + distance[i][start];
+            if (tourCost < minTourCost) {
+                minTourCost = tourCost;
+            }
+        }
+
+        int lastIndex = start;
+        int state = END_STATE;
+        tour.add(start);
+
+        // Reconstruct TSP path from memo table.
+        for (int i = 1; i < N; i++) {
+
+            int bestIndex = -1;
+            double bestDist = Double.POSITIVE_INFINITY;
+            for (int j = 0; j < N; j++) {
+                if (j == start || notIn(j, state)) continue;
+                double newDist = memo[j][state] + distance[j][lastIndex];
+                if (newDist < bestDist) {
+                    bestIndex = j;
+                    bestDist = newDist;
+                }
+            }
+
+            tour.add(bestIndex);
+            state = state ^ (1 << bestIndex);
+            lastIndex = bestIndex;
+        }
+
+        tour.add(start);
+        Collections.reverse(tour);
+
+        ranSolver = true;
+    }
+
+    private static boolean notIn(int elem, int subset) {
+        return ((1 << elem) & subset) == 0;
+    }
+
+    // This method generates all bit sets of size n where r bits
+    // are set to one. The result is returned as a list of integer masks.
+    public static List<Integer> combinations(int r, int n) {
+        List<Integer> subsets = new ArrayList<>();
+        combinations(0, 0, r, n, subsets);
+        return subsets;
+    }
+
+    // To find all the combinations of size r we need to recurse until we have
+    // selected r elements (aka r = 0), otherwise if r != 0 then we still need to select
+    // an element which is found after the position of our last selected element
+    private static void combinations(int set, int at, int r, int n, List<Integer> subsets) {
+
+        // Return early if there are more elements left to select than what is available.
+        int elementsLeftToPick = n - at;
+        if (elementsLeftToPick < r) return;
+
+        // We selected 'r' elements, so we found a valid subset!
+        if (r == 0) {
+            subsets.add(set);
+        } else {
+            for (int i = at; i < n; i++) {
+                // Try including this element
+                set ^= (1 << i);
+
+                combinations(set, i + 1, r - 1, n, subsets);
+
+                // Backtrack and try the instance where we did not include this element
+                set ^= (1 << i);
+            }
+        }
     }
 
     public static void printMatrix(double[][] matrix)
@@ -137,7 +212,7 @@ public class ThreadedTsp {
     public static void main(String[] args) {
 
         // Create adjacency matrix
-        int n = 10;
+        int n = 32;
         double[][] distanceMatrix = new double[n][n];
         ArrayList<double[]> matrix = new ArrayList<>();
         Random rand = new Random();
@@ -171,6 +246,7 @@ public class ThreadedTsp {
         double maxDistance = -1;
         double maxInfectionProbabilityMultiply = -1;
 
+        // Calculating maxDistance and maxInfectionProbabilityMultiply
         int row = 0;
         for(double[] i: matrix){
             int column = 0;
@@ -189,7 +265,7 @@ public class ThreadedTsp {
             row ++;
         }
 
-
+        // Calculating weight
         row = 0;
         for(double[] i: matrix){
             int column = 0;
@@ -208,7 +284,11 @@ public class ThreadedTsp {
         printMatrix(distanceMatrix);
         System.out.println();
 
+        long startTime = System.nanoTime();
         System.out.println("Tour: " + solver.getTour());
         System.out.println("Tour cost: " + solver.getTourCost());
+        long endTime = System.nanoTime();
+        long executionTimeForThreadedTsp = endTime - startTime;
+        System.out.println("Total Execution time: " + executionTimeForThreadedTsp);
     }
 }

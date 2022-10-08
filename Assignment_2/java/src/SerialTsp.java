@@ -46,10 +46,6 @@ public class SerialTsp {
             throw new IllegalArgumentException("Matrix must be square (N x N)");
         if (START_NODE < 0 || START_NODE >= N)
             throw new IllegalArgumentException("Starting node must be: 0 <= startNode < N");
-        if (N > 32)
-            throw new IllegalArgumentException(
-                    "Matrix too large! A matrix that size for the DP TSP problem with a time complexity of"
-                            + "O(n^2*2^n) requires way too much computation for any modern home computer to handle");
 
         // The finished state is when the finished state mask has all bits are set to
         // one (meaning all the nodes have been visited).
@@ -137,7 +133,7 @@ public class SerialTsp {
     public static void main(String[] args) {
 
         // Create adjacency matrix
-        int n = 10;
+        int n = 32;
         double[][] distanceMatrix = new double[n][n];
         ArrayList<double[]> matrix = new ArrayList<>();
         Random rand = new Random();
@@ -208,7 +204,11 @@ public class SerialTsp {
         printMatrix(distanceMatrix);
         System.out.println();
 
+        long startTime = System.nanoTime();
         System.out.println("Tour: " + solver.getTour());
         System.out.println("Tour cost: " + solver.getTourCost());
+        long endTime = System.nanoTime();
+        long executionTimeForSerialTsp = endTime - startTime;
+        System.out.println("Total Execution time: " + executionTimeForSerialTsp);
     }
 }
