@@ -12,10 +12,14 @@
  * @author Steven & Felix Halim, William Fiset, Micah Stairs
  */
 
-import java.util.*;
+import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Random;
 
 public class TspDynamicProgrammingRecursive {
 
+    private static final DecimalFormat df = new DecimalFormat("0.00");
     private final int N;
     private final int START_NODE;
     private final int FINISHED_STATE;
@@ -113,31 +117,84 @@ public class TspDynamicProgrammingRecursive {
         return memo[i][state] = minCost;
     }
 
+    public static void printMatrix(double[][] matrix)
+    {
+        int matrixLength =  matrix.length;
+        for(int i = 0; i < matrixLength; i++) {
+            for(int j = 0; j < matrixLength; j++) {
+                System.out.printf(df.format(matrix[i][j]) + "    ");
+            }
+            System.out.println();
+        }
+    }
+
+    private static double euclideanDistance(double x1, double y1, double x2, double y2){
+        return Math.sqrt((y2 - y1) * (y2 - y1) + (x2 - x1) * (x2 - x1));
+    }
+
+
     // Example usage:
     public static void main(String[] args) {
 
         // Create adjacency matrix
         int n = 6;
         double[][] distanceMatrix = new double[n][n];
+        ArrayList<double[]> matrix = new ArrayList<>();
         Random rand = new Random();
 
         // Static Way
-        for (double[] row : distanceMatrix) java.util.Arrays.fill(row, 10000);
-        distanceMatrix[1][4] = distanceMatrix[4][1] = 2;
-        distanceMatrix[4][2] = distanceMatrix[2][4] = 4;
-        distanceMatrix[2][3] = distanceMatrix[3][2] = 6;
-        distanceMatrix[3][0] = distanceMatrix[0][3] = 8;
-        distanceMatrix[0][5] = distanceMatrix[5][0] = 10;
-        distanceMatrix[5][1] = distanceMatrix[1][5] = 12;
+//        for (double[] row : distanceMatrix) java.util.Arrays.fill(row, 10000);
+//        distanceMatrix[1][4] = distanceMatrix[4][1] = 2;
+//        distanceMatrix[4][2] = distanceMatrix[2][4] = 4;
+//        distanceMatrix[2][3] = distanceMatrix[3][2] = 6;
+//        distanceMatrix[3][0] = distanceMatrix[0][3] = 8;
+//        distanceMatrix[0][5] = distanceMatrix[5][0] = 10;
+//        distanceMatrix[5][1] = distanceMatrix[1][5] = 12;
+
 
         // Dynamic Way
         for (int i = 0; i < n; i++){
-            int randomNumber = rand.nextInt(50); // Getting a random number form 0 to 50
+//            double xCoordinate = 1 + (100 - 1) * rand.nextDouble();
+//            double yCoordinate = 1 + (100 - 1) * rand.nextDouble();
+            int xCoordinate = rand.nextInt(100);
+            int yCoordinate = rand.nextInt(100);
+            double infectionProbability = rand.nextDouble();
 
+            double[] coordinate = new double[3];
+            coordinate[0] = xCoordinate;
+            coordinate[1] = yCoordinate;
+            coordinate[2] = infectionProbability;
+
+//            System.out.println(Arrays.toString(coordinate));
+//            System.out.println(infectionProbability);
+
+            matrix.add(coordinate);
         }
 
+        System.out.println("City Coordinates and Infection Probability (Randomly Generated):");
+        int countCoordinate = 0;
+        for(double[] i: matrix){
+            countCoordinate ++;
+            System.out.println("City " + countCoordinate + " => Coordinate: (" + i[0] + ", " + i[1] + ")\tand Infection Probability: " + df.format(i[2]));
+        }
+        System.out.println();
 
 
+        int row = 0;
+        for(double[] i: matrix){
+            int column = 0;
+            for(double[] j: matrix){
+//                System.out.println("x1: " + i[0] + ", y1: " + i[1] + ", x2: " + j[0] + ", y2: " + j[1]);
+                double distance = euclideanDistance(i[0], i[1], j[0], j[1]);
+//                System.out.println(distance);
+                distanceMatrix[row][column] = distance;
+                column ++;
+            }
+            row ++;
+        }
+        System.out.println("Distance Matrix:");
+        printMatrix(distanceMatrix);
+        System.out.println();
 
 
         // Run the solver
