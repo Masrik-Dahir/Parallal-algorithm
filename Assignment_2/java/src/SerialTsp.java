@@ -17,7 +17,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 
-public class TspDynamicProgrammingRecursive {
+public class SerialTsp {
 
     private static final DecimalFormat df = new DecimalFormat("0.00");
     private final int N;
@@ -30,11 +30,11 @@ public class TspDynamicProgrammingRecursive {
     private List<Integer> tour = new ArrayList<>();
     private boolean ranSolver = false;
 
-    public TspDynamicProgrammingRecursive(double[][] distance) {
+    public SerialTsp(double[][] distance) {
         this(0, distance);
     }
 
-    public TspDynamicProgrammingRecursive(int startNode, double[][] distance) {
+    public SerialTsp(int startNode, double[][] distance) {
 
         this.distance = distance;
         N = distance.length;
@@ -122,7 +122,7 @@ public class TspDynamicProgrammingRecursive {
         int matrixLength =  matrix.length;
         for(int i = 0; i < matrixLength; i++) {
             for(int j = 0; j < matrixLength; j++) {
-                System.out.printf(df.format(matrix[i][j]) + "    ");
+                System.out.printf(df.format(matrix[i][j]) + "\t");
             }
             System.out.println();
         }
@@ -137,19 +137,11 @@ public class TspDynamicProgrammingRecursive {
     public static void main(String[] args) {
 
         // Create adjacency matrix
-        int n = 6;
+        int n = 10;
         double[][] distanceMatrix = new double[n][n];
         ArrayList<double[]> matrix = new ArrayList<>();
         Random rand = new Random();
-
-        // Static Way
-//        for (double[] row : distanceMatrix) java.util.Arrays.fill(row, 10000);
-//        distanceMatrix[1][4] = distanceMatrix[4][1] = 2;
-//        distanceMatrix[4][2] = distanceMatrix[2][4] = 4;
-//        distanceMatrix[2][3] = distanceMatrix[3][2] = 6;
-//        distanceMatrix[3][0] = distanceMatrix[0][3] = 8;
-//        distanceMatrix[0][5] = distanceMatrix[5][0] = 10;
-//        distanceMatrix[5][1] = distanceMatrix[1][5] = 12;
+        SerialTsp solver = new SerialTsp(distanceMatrix);
 
 
         // Dynamic Way
@@ -165,9 +157,6 @@ public class TspDynamicProgrammingRecursive {
             coordinate[1] = yCoordinate;
             coordinate[2] = infectionProbability;
 
-//            System.out.println(Arrays.toString(coordinate));
-//            System.out.println(infectionProbability);
-
             matrix.add(coordinate);
         }
 
@@ -179,31 +168,47 @@ public class TspDynamicProgrammingRecursive {
         }
         System.out.println();
 
+        double maxDistance = -1;
+        double maxInfectionProbabilityMultiply = -1;
 
         int row = 0;
         for(double[] i: matrix){
             int column = 0;
             for(double[] j: matrix){
-//                System.out.println("x1: " + i[0] + ", y1: " + i[1] + ", x2: " + j[0] + ", y2: " + j[1]);
                 double distance = euclideanDistance(i[0], i[1], j[0], j[1]);
-//                System.out.println(distance);
-                distanceMatrix[row][column] = distance;
+                double infectionProbabilityMultiply = i[2]*j[2];
+
+                if (distance > maxDistance){
+                    maxDistance = distance;
+                }
+                if (infectionProbabilityMultiply > maxInfectionProbabilityMultiply){
+                    maxInfectionProbabilityMultiply = infectionProbabilityMultiply;
+                }
                 column ++;
             }
             row ++;
         }
-        System.out.println("Distance Matrix:");
+
+
+        row = 0;
+        for(double[] i: matrix){
+            int column = 0;
+            for(double[] j: matrix){
+
+                double distance = euclideanDistance(i[0], i[1], j[0], j[1]);
+                double infectionProbabilityMultiply = i[2]*j[2];
+
+                distanceMatrix[row][column] = (0.5*distance)/maxDistance + (0.5*infectionProbabilityMultiply)/maxInfectionProbabilityMultiply;
+                column ++;
+            }
+            row ++;
+        }
+
+        System.out.println("Weighted Adjacency Matrix:");
         printMatrix(distanceMatrix);
         System.out.println();
 
-
-        // Run the solver
-        TspDynamicProgrammingRecursive solver = new TspDynamicProgrammingRecursive(distanceMatrix);
-
-        // Prints: [0, 3, 2, 4, 1, 5, 0]
         System.out.println("Tour: " + solver.getTour());
-
-        // Print: 42.0
         System.out.println("Tour cost: " + solver.getTourCost());
     }
 }
