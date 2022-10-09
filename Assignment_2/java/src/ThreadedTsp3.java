@@ -14,13 +14,17 @@
 
 import java.text.DecimalFormat;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public class ThreadedTsp3 {
 
+    // Declaring number Of Blocks and number Of City Per Block
+    private static final int numberOfBlocks = 1000;
+    private static final int numberOfCityPerBlock = 10;
+
     private static final DecimalFormat df = new DecimalFormat("0.00");
+
+    // Create adjacency matrix
     private static int N = 0;
     private static int start = 0;
     private static double[][] distance = new double[0][];
@@ -298,29 +302,17 @@ public class ThreadedTsp3 {
     // Example usage:
     public static void main(String[] args) throws InterruptedException {
 
-        // Create adjacency matrix
-        int numberOfBlocks = 1000;
-        int numberOfCityPerBlock = 10;
-
         long startTime = System.nanoTime();
         int count = 0;
         while (count < numberOfBlocks){
 
             Threading thread = new Threading(numberOfCityPerBlock, count);
             new Thread(thread).start();
-
-
-            if (count != 0){
-                Thread.sleep(0,1);
-            }
-
-            if (count == numberOfBlocks-1){
-                totalTpsPath.add(totalTpsPath.get(0));
-            }
-
             count ++;
         }
 
+        TimeUnit.SECONDS.sleep(1);
+        totalTpsPath.add(totalTpsPath.get(0));
 
         long endTime = System.nanoTime();
         long executionTimeForThreadedTsp3 = endTime - startTime;

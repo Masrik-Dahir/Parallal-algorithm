@@ -14,12 +14,13 @@
 
 import java.text.DecimalFormat;
 import java.util.*;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 public class MPITsp {
 
+    // Declaring number Of Blocks and number Of City Per Block
+    private static final int numberOfBlocks = 1000;
+    private static final int numberOfCityPerBlock = 10;
     private static final DecimalFormat df = new DecimalFormat("0.00");
     private static int N = 0;
     private static int start = 0;
@@ -31,6 +32,8 @@ public class MPITsp {
     private static double newDistance;
 
     private static double totaltourCost = 0;
+
+    static ArrayList<Integer> totalTpsPath = new ArrayList<Integer>();
 
     public MPITsp(double[][] distance) {
         this(0, distance);
@@ -203,13 +206,6 @@ public class MPITsp {
             matrix.add(coordinate);
         }
 
-//        System.out.println("City Coordinates and Infection Probability (Randomly Generated):");
-        int countCoordinate = 0;
-        for(double[] i: matrix){
-            countCoordinate ++;
-//            System.out.println("City " + countCoordinate + " => Coordinate: (" + i[0] + ", " + i[1] + ")\tand Infection Probability: " + df.format(i[2]));
-        }
-//        System.out.println();
 
         double maxDistance = -1;
         double maxInfectionProbabilityMultiply = -1;
@@ -248,63 +244,74 @@ public class MPITsp {
             row ++;
         }
 
-//        System.out.println("Weighted Adjacency Matrix:");
-//        printMatrix(distanceMatrix);
-//        System.out.println();
-
         ArrayList<Integer> blockTour = new ArrayList<>();
         for (Integer integer: solver.getTour()){
             blockTour.add(integer+finalCount*10);
         }
+        blockTour.remove(blockTour.size() - 1);
 
 
         double blockTourCost = solver.getTourCost();
         totaltourCost += blockTourCost;
 
-        System.out.println("Block: " + ++finalCount);
-        System.out.println("Tour: " + blockTour);
-        System.out.println("Tour cost: " + blockTourCost);
-
-        System.out.println();
+        if (finalCount == 0){
+            System.out.println("(Master process): Block " + finalCount + "\t- TSP calculated " + blockTour);
+        }
+        else{
+            System.out.println("(Slave process): Block " + finalCount + "\t- TSP calculated " + blockTour + " and send to master process");
+        }
 
         return blockTour;
+    }
+
+    static class Threading implements Runnable {
+        int numberOfCityPerBlock;
+        int finalCount;
+
+
+        public Threading(int numberOfCityPerBlock, int finalCount) {
+            // store parameter for later user
+            this.numberOfCityPerBlock = numberOfCityPerBlock;
+            this.finalCount = finalCount;
+        }
+
+        @Override
+        public void run() {
+            try {
+                ArrayList<Integer> blockTpsPath = printTsp(numberOfCityPerBlock, finalCount);
+                totalTpsPath.addAll(blockTpsPath);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
     }
 
     // Example usage:
     public static void main(String[] args) throws InterruptedException {
 
-        // Create adjacency matrix
-        int numberOfBlocks = 100000;
-        int numberOfCityPerBlock = 10;
-
         long startTime = System.nanoTime();
-        ArrayList<Integer> totalTpsPath = new ArrayList<Integer>();
-        int count = 0;
+
+        // n-1 slave Blocks
+        int count = 1;
         while (count < numberOfBlocks){
-            ExecutorService executorService = Executors.newCachedThreadPool();
-            int finalCount = count;
-            executorService.execute(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        ArrayList<Integer> blockTpsPath = printTsp(numberOfCityPerBlock, finalCount);
-                        totalTpsPath.addAll(blockTpsPath);
-                        while(true){
-                            System.out.println("Thread: " + finalCount);
-                        }
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-            });
-            executorService.shutdown();
-            boolean finished = executorService.awaitTermination(1, TimeUnit.MINUTES);
+
+            Threading thread = new Threading(numberOfCityPerBlock, count);
+            new Thread(thread).start();
             count ++;
         }
 
+        // 1 master block
+        Threading thread = new Threading(numberOfCityPerBlock, 0);
+        new Thread(thread).start();
+
+        // Closing the path
+        TimeUnit.SECONDS.sleep(1);
+        totalTpsPath.add(totalTpsPath.get(0));
+
         long endTime = System.nanoTime();
         long executionTimeForMPITsp = endTime - startTime;
-        System.out.println("Total TSP: " + totalTpsPath);
+        System.out.println("\nTotal TSP: " + totalTpsPath);
         System.out.println("Total Cost: " + totaltourCost);
         System.out.println("Total Execution time: " + executionTimeForMPITsp);
 
