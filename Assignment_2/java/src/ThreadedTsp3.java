@@ -19,12 +19,9 @@ import java.util.concurrent.TimeUnit;
 public class ThreadedTsp3 {
 
     // Declaring number Of Blocks and number Of City Per Block
-    private static final int numberOfBlocks = 1000;
+    private static final int numberOfBlocks = 10;
     private static final int numberOfCityPerBlock = 10;
-
     private static final DecimalFormat df = new DecimalFormat("0.00");
-
-    // Create adjacency matrix
     private static int N = 0;
     private static int start = 0;
     private static double[][] distance = new double[0][];
@@ -37,6 +34,8 @@ public class ThreadedTsp3 {
     private static double totaltourCost = 0;
 
     static ArrayList<Integer> totalTpsPath = new ArrayList<Integer>();
+
+    private static ArrayList<double[]> universalMatrix = new ArrayList<>();
 
     public ThreadedTsp3(double[][] distance) {
         this(0, distance);
@@ -174,8 +173,13 @@ public class ThreadedTsp3 {
         }
     }
 
-    public static void printMatrix(double[][] matrix)
-    {
+    public static void printArrayList(ArrayList<double[]> matrix){
+        for (double[] i: matrix){
+            System.out.println(Arrays.toString(i));
+        }
+    }
+
+    public static void printMatrix(double[][] matrix) {
         int matrixLength =  matrix.length;
         for(int i = 0; i < matrixLength; i++) {
             for(int j = 0; j < matrixLength; j++) {

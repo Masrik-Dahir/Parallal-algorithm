@@ -12,6 +12,7 @@
  * @author Steven & Felix Halim, William Fiset, Micah Stairs
  */
 
+import java.awt.geom.Line2D;
 import java.text.DecimalFormat;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -19,7 +20,7 @@ import java.util.concurrent.TimeUnit;
 public class MPITsp {
 
     // Declaring number Of Blocks and number Of City Per Block
-    private static final int numberOfBlocks = 1000;
+    private static final int numberOfBlocks = 10;
     private static final int numberOfCityPerBlock = 10;
     private static final DecimalFormat df = new DecimalFormat("0.00");
     private static int N = 0;
@@ -34,6 +35,8 @@ public class MPITsp {
     private static double totaltourCost = 0;
 
     static ArrayList<Integer> totalTpsPath = new ArrayList<Integer>();
+
+    private static ArrayList<double[]> universalMatrix = new ArrayList<>();
 
     public MPITsp(double[][] distance) {
         this(0, distance);
@@ -171,8 +174,13 @@ public class MPITsp {
         }
     }
 
-    public static void printMatrix(double[][] matrix)
-    {
+    public static void printArrayList(ArrayList<double[]> matrix){
+        for (double[] i: matrix){
+            System.out.println(Arrays.toString(i));
+        }
+    }
+
+    public static void printMatrix(double[][] matrix) {
         int matrixLength =  matrix.length;
         for(int i = 0; i < matrixLength; i++) {
             for(int j = 0; j < matrixLength; j++) {
@@ -186,26 +194,51 @@ public class MPITsp {
         return Math.sqrt((y2 - y1) * (y2 - y1) + (x2 - x1) * (x2 - x1));
     }
 
-    public static ArrayList<Integer> printTsp(int numberOfCityPerBlock, int finalCount) throws InterruptedException {
-        double[][] distanceMatrix = new double[numberOfCityPerBlock][numberOfCityPerBlock];
-        ArrayList<double[]> matrix = new ArrayList<>();
-        Random rand = new Random();
-        MPITsp solver = new MPITsp(distanceMatrix);
 
+    private static double[][] getDistanceMatrix (ArrayList<double[]> matrix){
+        double maxDistance = -1;
+        double maxInfectionProbabilityMultiply = -1;
+        double[][] distanceMatrix = new double[matrix.size()][matrix.size()];
 
-        for (int i = 0; i < numberOfCityPerBlock; i++){
-            int xCoordinate = rand.nextInt(100);
-            int yCoordinate = rand.nextInt(100);
-            double infectionProbability = rand.nextDouble();
+        // Calculating maxDistance and maxInfectionProbabilityMultiply
+        int row = 0;
+        for(double[] i: matrix){
+            int column = 0;
+            for(double[] j: matrix){
+                double distance = euclideanDistance(i[0], i[1], j[0], j[1]);
+                double infectionProbabilityMultiply = i[2]*j[2];
 
-            double[] coordinate = new double[3];
-            coordinate[0] = xCoordinate;
-            coordinate[1] = yCoordinate;
-            coordinate[2] = infectionProbability;
-
-            matrix.add(coordinate);
+                if (distance > maxDistance){
+                    maxDistance = distance;
+                }
+                if (infectionProbabilityMultiply > maxInfectionProbabilityMultiply){
+                    maxInfectionProbabilityMultiply = infectionProbabilityMultiply;
+                }
+                column ++;
+            }
+            row ++;
         }
 
+        // Calculating weight
+        row = 0;
+        for(double[] i: matrix){
+            int column = 0;
+            for(double[] j: matrix){
+
+                double distance = euclideanDistance(i[0], i[1], j[0], j[1]);
+                double infectionProbabilityMultiply = i[2]*j[2];
+
+                distanceMatrix[row][column] = (0.5*distance)/maxDistance + (0.5*infectionProbabilityMultiply)/maxInfectionProbabilityMultiply;
+                column ++;
+            }
+            row ++;
+        }
+        return distanceMatrix;
+    }
+
+    public static ArrayList<Integer> printTsp(ArrayList<double[]> matrix, int numberOfCityPerBlock, int finalCount) throws InterruptedException {
+        double[][] distanceMatrix = new double[numberOfCityPerBlock][numberOfCityPerBlock];
+        MPITsp solver = new MPITsp(distanceMatrix);
 
         double maxDistance = -1;
         double maxInfectionProbabilityMultiply = -1;
@@ -265,12 +298,14 @@ public class MPITsp {
     }
 
     static class Threading implements Runnable {
+        ArrayList<double[]> matrix;
         int numberOfCityPerBlock;
         int finalCount;
 
 
-        public Threading(int numberOfCityPerBlock, int finalCount) {
+        public Threading(ArrayList<double[]> matrix, int numberOfCityPerBlock, int finalCount) {
             // store parameter for later user
+            this.matrix = matrix;
             this.numberOfCityPerBlock = numberOfCityPerBlock;
             this.finalCount = finalCount;
         }
@@ -278,7 +313,7 @@ public class MPITsp {
         @Override
         public void run() {
             try {
-                ArrayList<Integer> blockTpsPath = printTsp(numberOfCityPerBlock, finalCount);
+                ArrayList<Integer> blockTpsPath = printTsp(matrix, numberOfCityPerBlock, finalCount);
                 totalTpsPath.addAll(blockTpsPath);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
@@ -291,19 +326,40 @@ public class MPITsp {
     public static void main(String[] args) throws InterruptedException {
 
         long startTime = System.nanoTime();
+        Random rand = new Random();
 
-        // n-1 slave Blocks
-        int count = 1;
-        while (count < numberOfBlocks){
 
-            Threading thread = new Threading(numberOfCityPerBlock, count);
-            new Thread(thread).start();
-            count ++;
+        for (int blocks = 0; blocks < numberOfBlocks; blocks++){
+            ArrayList<double[]> matrix = new ArrayList<>();
+            for (int i = 0; i < numberOfCityPerBlock; i++){
+                int xCoordinate = rand.nextInt(100);
+                int yCoordinate = rand.nextInt(100);
+                double infectionProbability = rand.nextDouble();
+
+                double[] coordinate = new double[3];
+                coordinate[0] = xCoordinate;
+                coordinate[1] = yCoordinate;
+                coordinate[2] = infectionProbability;
+
+                matrix.add(coordinate);
+            }
+
+            // n-1 slave Blocks
+            if (blocks != 0){
+                Threading thread = new Threading(matrix, numberOfCityPerBlock, blocks);
+                new Thread(thread).start();
+            }
+
+
+            // 1 master block
+            if (blocks == 0){
+                Threading thread = new Threading(matrix, numberOfCityPerBlock, 0);
+                new Thread(thread).start();
+            }
+
+            universalMatrix.addAll(matrix);
+
         }
-
-        // 1 master block
-        Threading thread = new Threading(numberOfCityPerBlock, 0);
-        new Thread(thread).start();
 
         // Closing the path
         TimeUnit.SECONDS.sleep(1);
@@ -313,7 +369,66 @@ public class MPITsp {
         long executionTimeForMPITsp = endTime - startTime;
         System.out.println("\nTotal TSP: " + totalTpsPath);
         System.out.println("Total Cost: " + totaltourCost);
-        System.out.println("Total Execution time: " + executionTimeForMPITsp);
+        System.out.println("Total Execution time: " + executionTimeForMPITsp + "\n");
+
+//        System.out.println("\nWeighted Adjacency Matrix: ");
+//        printMatrix(getDistanceMatrix(universalMatrix));
+
+
+        ArrayList<Integer> beforeInversion = (ArrayList<Integer>) totalTpsPath.clone();
+
+        for (int i = 0; i < totalTpsPath.size() - 3; i ++) {
+            double[] firstNodeCoordinate = new double[2];
+            double[] secondNodeCoordinate = new double[2];
+            double[] thirdNodeCoordinate = new double[2];
+            double[] fourthNodeCoordinate = new double[2];
+
+            int firstNodeIndex = i;
+            int secondNodeIndex = i+1;
+            int thirdNodeIndex = i+2;
+            int fourthNodeIndex = i+3;
+
+            int firstNode = totalTpsPath.get(firstNodeIndex);
+            int secondNode = totalTpsPath.get(secondNodeIndex);
+            int thirdNode = totalTpsPath.get(thirdNodeIndex);
+            int fourthNode = totalTpsPath.get(fourthNodeIndex);
+
+            firstNodeCoordinate[0] = universalMatrix.get(totalTpsPath.get(firstNodeIndex))[0];
+            firstNodeCoordinate[1] = universalMatrix.get(totalTpsPath.get(firstNodeIndex))[1];
+
+            secondNodeCoordinate[0] = universalMatrix.get(totalTpsPath.get(secondNodeIndex))[0];
+            secondNodeCoordinate[1] = universalMatrix.get(totalTpsPath.get(secondNodeIndex))[1];
+
+            thirdNodeCoordinate[0] = universalMatrix.get(totalTpsPath.get(thirdNodeIndex))[0];
+            thirdNodeCoordinate[1] = universalMatrix.get(totalTpsPath.get(thirdNodeIndex))[1];
+
+            fourthNodeCoordinate[0] = universalMatrix.get(totalTpsPath.get(fourthNodeIndex))[0];
+            fourthNodeCoordinate[1] = universalMatrix.get(totalTpsPath.get(fourthNodeIndex))[1];
+
+            Line2D firstLine2D = new Line2D.Float((float)firstNodeCoordinate[0], (float)firstNodeCoordinate[1], (float)secondNodeCoordinate[0], (float)secondNodeCoordinate[1]);
+            Line2D secondLine2D = new Line2D.Float((float)thirdNodeCoordinate[0], (float)thirdNodeCoordinate[1], (float)fourthNodeCoordinate[0], (float)fourthNodeCoordinate[1]);
+            boolean secondLine2DCrossFirstLine2D = secondLine2D.intersectsLine(firstLine2D);
+            if (secondLine2DCrossFirstLine2D){
+                System.out.print("Inversion required for node " +
+                        totalTpsPath.get(i) + ", node " +
+                        totalTpsPath.get(i+1) + ", node " +
+                        totalTpsPath.get(i+2) + ", and node " +
+                        totalTpsPath.get(i+3) +
+                        ":\t" +
+                        Arrays.toString(firstNodeCoordinate) + ", " +
+                        Arrays.toString(secondNodeCoordinate) + ", " +
+                        Arrays.toString(thirdNodeCoordinate) + ", " +
+                        Arrays.toString(fourthNodeCoordinate) + " and ");
+
+                totalTpsPath.set(secondNodeIndex, thirdNode);
+                totalTpsPath.set(thirdNodeIndex, secondNode);
+                System.out.println("Inversion Handled");
+            }
+
+        }
+        ArrayList<Integer> afterInversion = totalTpsPath;
+        System.out.println("\nBefore Inversion:\t" + beforeInversion);
+        System.out.println("After Inversion:\t" + afterInversion);
 
     }
 }
