@@ -18,7 +18,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-public class MPITsp implements Runnable{
+public class MPITsp {
 
     private static final DecimalFormat df = new DecimalFormat("0.00");
     private static int N = 0;
@@ -187,7 +187,7 @@ public class MPITsp implements Runnable{
         double[][] distanceMatrix = new double[numberOfCityPerBlock][numberOfCityPerBlock];
         ArrayList<double[]> matrix = new ArrayList<>();
         Random rand = new Random();
-        MPITsp solver = new MPITsp(distanceMatrix, 0);
+        MPITsp solver = new MPITsp(distanceMatrix);
 
 
         for (int i = 0; i < numberOfCityPerBlock; i++){
@@ -270,27 +270,43 @@ public class MPITsp implements Runnable{
         return blockTour;
     }
 
-    @Override
-    public void run() {
-        System.out.println(countThread);
-    }
-
     // Example usage:
     public static void main(String[] args) throws InterruptedException {
 
         // Create adjacency matrix
-        int numberOfBlocks = 1000;
+        int numberOfBlocks = 100000;
         int numberOfCityPerBlock = 10;
 
+        long startTime = System.nanoTime();
+        ArrayList<Integer> totalTpsPath = new ArrayList<Integer>();
+        int count = 0;
+        while (count < numberOfBlocks){
+            ExecutorService executorService = Executors.newCachedThreadPool();
+            int finalCount = count;
+            executorService.execute(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        ArrayList<Integer> blockTpsPath = printTsp(numberOfCityPerBlock, finalCount);
+                        totalTpsPath.addAll(blockTpsPath);
+                        while(true){
+                            System.out.println("Thread: " + finalCount);
+                        }
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+            });
+            executorService.shutdown();
+            boolean finished = executorService.awaitTermination(1, TimeUnit.MINUTES);
+            count ++;
+        }
 
-        double[][] distanceMatrix = new double[numberOfCityPerBlock][numberOfCityPerBlock];
-        int countThread = 0;
-        Thread thread0 = new Thread(new MPITsp(distanceMatrix, countThread));
-//        Thread thread1 = new Thread(new MPITsp(distanceMatrix, ));
-
-        thread0.start();
-
-
+        long endTime = System.nanoTime();
+        long executionTimeForMPITsp = endTime - startTime;
+        System.out.println("Total TSP: " + totalTpsPath);
+        System.out.println("Total Cost: " + totaltourCost);
+        System.out.println("Total Execution time: " + executionTimeForMPITsp);
 
     }
 }

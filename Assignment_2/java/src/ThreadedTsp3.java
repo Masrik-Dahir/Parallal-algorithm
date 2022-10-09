@@ -32,6 +32,8 @@ public class ThreadedTsp3 {
 
     private static double totaltourCost = 0;
 
+    static ArrayList<Integer> totalTpsPath = new ArrayList<Integer>();
+
     public ThreadedTsp3(double[][] distance) {
         this(0, distance);
     }
@@ -256,18 +258,41 @@ public class ThreadedTsp3 {
         for (Integer integer: solver.getTour()){
             blockTour.add(integer+finalCount*10);
         }
+        blockTour.remove(blockTour.size() - 1);
 
 
         double blockTourCost = solver.getTourCost();
         totaltourCost += blockTourCost;
 
-        System.out.println("Block: " + ++finalCount);
-        System.out.println("Tour: " + blockTour);
-        System.out.println("Tour cost: " + blockTourCost);
+//        System.out.println("Block: " + ++finalCount);
+//        System.out.println("Tour: " + blockTour);
+//        System.out.println("Tour cost: " + blockTourCost);
 
-        System.out.println();
 
         return blockTour;
+    }
+
+    static class Threading implements Runnable {
+        int numberOfCityPerBlock;
+        int finalCount;
+
+
+        public Threading(int numberOfCityPerBlock, int finalCount) {
+            // store parameter for later user
+            this.numberOfCityPerBlock = numberOfCityPerBlock;
+            this.finalCount = finalCount;
+        }
+
+        @Override
+        public void run() {
+            try {
+                ArrayList<Integer> blockTpsPath = printTsp(numberOfCityPerBlock, finalCount);
+                totalTpsPath.addAll(blockTpsPath);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
     }
 
     // Example usage:
@@ -278,26 +303,24 @@ public class ThreadedTsp3 {
         int numberOfCityPerBlock = 10;
 
         long startTime = System.nanoTime();
-        ArrayList<Integer> totalTpsPath = new ArrayList<Integer>();
         int count = 0;
         while (count < numberOfBlocks){
-            ExecutorService executorService = Executors.newCachedThreadPool();
-            int finalCount = count;
-            executorService.execute(new Runnable() {
-                @Override
-                public void run() {
-                    try {
-                        ArrayList<Integer> blockTpsPath = printTsp(numberOfCityPerBlock, finalCount);
-                        totalTpsPath.addAll(blockTpsPath);
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
-                }
-            });
-            executorService.shutdown();
-            boolean finished = executorService.awaitTermination(1, TimeUnit.MINUTES);
+
+            Threading thread = new Threading(numberOfCityPerBlock, count);
+            new Thread(thread).start();
+
+
+            if (count != 0){
+                Thread.sleep(0,1);
+            }
+
+            if (count == numberOfBlocks-1){
+                totalTpsPath.add(totalTpsPath.get(0));
+            }
+
             count ++;
         }
+
 
         long endTime = System.nanoTime();
         long executionTimeForThreadedTsp3 = endTime - startTime;
