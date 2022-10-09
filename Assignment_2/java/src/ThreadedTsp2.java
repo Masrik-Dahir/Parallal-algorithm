@@ -1,10 +1,15 @@
 /**
- * An implementation of the traveling salesman problem in Java using dynamic programming to improve
- * the time complexity from O(n!) to O(n^2 * 2^n).
+ * This file contains a recursive implementation of the TSP problem using dynamic programming. The
+ * main idea is that since we need to do all n! permutations of nodes to find the optimal solution
+ * that caching the results of sub paths can improve performance.
+ *
+ * <p>For example, if one permutation is: '... D A B C' then later when we need to compute the value
+ * of the permutation '... E B A C' we should already have cached the answer for the subgraph
+ * containing the nodes {A, B, C}.
  *
  * <p>Time Complexity: O(n^2 * 2^n) Space Complexity: O(n * 2^n)
  *
- * @author William Fiset, william.alexandre.fiset@gmail.com
+ * @author Steven & Felix Halim, William Fiset, Micah Stairs
  */
 
 import java.text.DecimalFormat;
@@ -12,54 +17,78 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Random;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
-public class TspDynamicProgrammingIterative {
+public class ThreadedTsp2 {
 
     private static final DecimalFormat df = new DecimalFormat("0.00");
-
-    private final int N, start;
-    private final double[][] distance;
+    private static int N = 0;
+    private static int start = 0;
+    private static double[][] distance = new double[0][];
     private List<Integer> tour = new ArrayList<>();
     private double minTourCost = Double.POSITIVE_INFINITY;
     private boolean ranSolver = false;
 
-    public TspDynamicProgrammingIterative(double[][] distance) {
+    private static double newDistance;
+
+    static class Threading implements Runnable {
+        int next;
+        int subsetWithoutNext;
+
+        Double[][] memo;
+        int end;
+
+
+        public Threading(int next, int subsetWithoutNext, int end, Double[][] memo) {
+            // store parameter for later user
+            this.next = next;
+            this.subsetWithoutNext = subsetWithoutNext;
+            this.end = end;
+            this.memo = memo;
+        }
+
+        @Override
+        public void run() {
+            newDistance = memo[end][subsetWithoutNext] + distance[end][next];
+        }
+
+    }
+
+    public ThreadedTsp2(double[][] distance) {
         this(0, distance);
     }
 
-    public TspDynamicProgrammingIterative(int start, double[][] distance) {
+    public ThreadedTsp2(int start, double[][] distance) {
         N = distance.length;
 
         if (N <= 2) throw new IllegalStateException("N <= 2 not yet supported.");
         if (N != distance[0].length) throw new IllegalStateException("Matrix must be square (n x n)");
         if (start < 0 || start >= N) throw new IllegalArgumentException("Invalid start node.");
-        if (N > 32)
-            throw new IllegalArgumentException(
-                    "Matrix too large! A matrix that size for the DP TSP problem with a time complexity of"
-                            + "O(n^2*2^n) requires way too much computation for any modern home computer to handle");
 
-        this.start = start;
-        this.distance = distance;
+        ThreadedTsp2.start = start;
+        ThreadedTsp2.distance = distance;
     }
 
     // Returns the optimal tour for the traveling salesman problem.
-    public List<Integer> getTour() {
+    public List<Integer> getTour() throws InterruptedException {
         if (!ranSolver) solve();
         return tour;
     }
 
     // Returns the minimal tour cost.
-    public double getTourCost() {
+    public double getTourCost() throws InterruptedException {
         if (!ranSolver) solve();
         return minTourCost;
     }
 
-    // Solves the traveling salesman problem and caches solution.
-    public void solve() {
 
+    // Solves the traveling salesman problem and caches solution.
+    public void solve() throws InterruptedException {
         if (ranSolver) return;
 
-        final int END_STATE = (1 << N) - 1;
+        int END_STATE = (1 << N) - 1;
         Double[][] memo = new Double[N][1 << N];
 
         // Add all outgoing edges from the starting node to memo table.
@@ -71,19 +100,35 @@ public class TspDynamicProgrammingIterative {
         for (int r = 3; r <= N; r++) {
             for (int subset : combinations(r, N)) {
                 if (notIn(start, subset)) continue;
-                for (int next = 0; next < N; next++) {
-                    if (next == start || notIn(next, subset)) continue;
-                    int subsetWithoutNext = subset ^ (1 << next);
-                    double minDist = Double.POSITIVE_INFINITY;
-                    for (int end = 0; end < N; end++) {
-                        if (end == start || end == next || notIn(end, subset)) continue;
-                        double newDistance = memo[end][subsetWithoutNext] + distance[end][next];
-                        if (newDistance < minDist) {
-                            minDist = newDistance;
+                ExecutorService es = Executors.newCachedThreadPool();
+                es.execute(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            for (int next = 0; next < N; next++) {
+                                if (next == start || notIn(next, subset)) continue;
+                                int subsetWithoutNext = subset ^ (1 << next);
+                                double minDist = Double.POSITIVE_INFINITY;
+                                for (int end = 0; end < N; end++) {
+                                    if (end == start || end == next || notIn(end, subset)) continue;
+
+                                    newDistance = memo[end][subsetWithoutNext] + distance[end][next];
+
+                                    if (newDistance < minDist) {
+                                        minDist = newDistance;
+                                    }
+                                }
+                                memo[next][subset] = minDist;
+                            }
+                        }
+                        catch (Exception e) {
+                            System.out.println("Exception is caught");
                         }
                     }
-                    memo[next][subset] = minDist;
-                }
+                });
+
+                es.shutdown();
+                boolean finished = es.awaitTermination(1, TimeUnit.MINUTES);
             }
         }
 
@@ -146,7 +191,7 @@ public class TspDynamicProgrammingIterative {
         int elementsLeftToPick = n - at;
         if (elementsLeftToPick < r) return;
 
-        // We selected 'r' elements so we found a valid subset!
+        // We selected 'r' elements, so we found a valid subset!
         if (r == 0) {
             subsets.add(set);
         } else {
@@ -177,11 +222,12 @@ public class TspDynamicProgrammingIterative {
         return Math.sqrt((y2 - y1) * (y2 - y1) + (x2 - x1) * (x2 - x1));
     }
 
+
     // Example usage:
     public static void main(String[] args) throws InterruptedException {
 
         // Create adjacency matrix
-        int n = 20;
+        int n = 24;
         double[][] distanceMatrix = new double[n][n];
         ArrayList<double[]> matrix = new ArrayList<>();
         Random rand = new Random();
