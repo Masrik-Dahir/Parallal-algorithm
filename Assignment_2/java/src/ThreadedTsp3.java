@@ -12,6 +12,7 @@
  * @author Steven & Felix Halim, William Fiset, Micah Stairs
  */
 
+import java.awt.geom.Line2D;
 import java.text.DecimalFormat;
 import java.util.*;
 import java.util.concurrent.TimeUnit;
@@ -193,33 +194,51 @@ public class ThreadedTsp3 {
         return Math.sqrt((y2 - y1) * (y2 - y1) + (x2 - x1) * (x2 - x1));
     }
 
-    public static ArrayList<Integer> printTsp(int numberOfCityPerBlock, int finalCount) throws InterruptedException {
-        double[][] distanceMatrix = new double[numberOfCityPerBlock][numberOfCityPerBlock];
-        ArrayList<double[]> matrix = new ArrayList<>();
-        Random rand = new Random();
-        ThreadedTsp3 solver = new ThreadedTsp3(distanceMatrix);
 
+    private static double[][] getDistanceMatrix (ArrayList<double[]> matrix){
+        double maxDistance = -1;
+        double maxInfectionProbabilityMultiply = -1;
+        double[][] distanceMatrix = new double[matrix.size()][matrix.size()];
 
-        for (int i = 0; i < numberOfCityPerBlock; i++){
-            int xCoordinate = rand.nextInt(100);
-            int yCoordinate = rand.nextInt(100);
-            double infectionProbability = rand.nextDouble();
-
-            double[] coordinate = new double[3];
-            coordinate[0] = xCoordinate;
-            coordinate[1] = yCoordinate;
-            coordinate[2] = infectionProbability;
-
-            matrix.add(coordinate);
-        }
-
-//        System.out.println("City Coordinates and Infection Probability (Randomly Generated):");
-        int countCoordinate = 0;
+        // Calculating maxDistance and maxInfectionProbabilityMultiply
+        int row = 0;
         for(double[] i: matrix){
-            countCoordinate ++;
-//            System.out.println("City " + countCoordinate + " => Coordinate: (" + i[0] + ", " + i[1] + ")\tand Infection Probability: " + df.format(i[2]));
+            int column = 0;
+            for(double[] j: matrix){
+                double distance = euclideanDistance(i[0], i[1], j[0], j[1]);
+                double infectionProbabilityMultiply = i[2]*j[2];
+
+                if (distance > maxDistance){
+                    maxDistance = distance;
+                }
+                if (infectionProbabilityMultiply > maxInfectionProbabilityMultiply){
+                    maxInfectionProbabilityMultiply = infectionProbabilityMultiply;
+                }
+                column ++;
+            }
+            row ++;
         }
-//        System.out.println();
+
+        // Calculating weight
+        row = 0;
+        for(double[] i: matrix){
+            int column = 0;
+            for(double[] j: matrix){
+
+                double distance = euclideanDistance(i[0], i[1], j[0], j[1]);
+                double infectionProbabilityMultiply = i[2]*j[2];
+
+                distanceMatrix[row][column] = (0.5*distance)/maxDistance + (0.5*infectionProbabilityMultiply)/maxInfectionProbabilityMultiply;
+                column ++;
+            }
+            row ++;
+        }
+        return distanceMatrix;
+    }
+
+    public static ArrayList<Integer> printTsp(ArrayList<double[]> matrix, int numberOfCityPerBlock, int finalCount) throws InterruptedException {
+        double[][] distanceMatrix = new double[numberOfCityPerBlock][numberOfCityPerBlock];
+        ThreadedTsp3 solver = new ThreadedTsp3(distanceMatrix);
 
         double maxDistance = -1;
         double maxInfectionProbabilityMultiply = -1;
@@ -258,10 +277,6 @@ public class ThreadedTsp3 {
             row ++;
         }
 
-//        System.out.println("Weighted Adjacency Matrix:");
-//        printMatrix(distanceMatrix);
-//        System.out.println();
-
         ArrayList<Integer> blockTour = new ArrayList<>();
         for (Integer integer: solver.getTour()){
             blockTour.add(integer+finalCount*10);
@@ -272,21 +287,18 @@ public class ThreadedTsp3 {
         double blockTourCost = solver.getTourCost();
         totaltourCost += blockTourCost;
 
-//        System.out.println("Block: " + ++finalCount);
-//        System.out.println("Tour: " + blockTour);
-//        System.out.println("Tour cost: " + blockTourCost);
-
-
         return blockTour;
     }
 
     static class Threading implements Runnable {
+        ArrayList<double[]> matrix;
         int numberOfCityPerBlock;
         int finalCount;
 
 
-        public Threading(int numberOfCityPerBlock, int finalCount) {
+        public Threading(ArrayList<double[]> matrix, int numberOfCityPerBlock, int finalCount) {
             // store parameter for later user
+            this.matrix = matrix;
             this.numberOfCityPerBlock = numberOfCityPerBlock;
             this.finalCount = finalCount;
         }
@@ -294,7 +306,7 @@ public class ThreadedTsp3 {
         @Override
         public void run() {
             try {
-                ArrayList<Integer> blockTpsPath = printTsp(numberOfCityPerBlock, finalCount);
+                ArrayList<Integer> blockTpsPath = printTsp(matrix, numberOfCityPerBlock, finalCount);
                 totalTpsPath.addAll(blockTpsPath);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
@@ -307,22 +319,98 @@ public class ThreadedTsp3 {
     public static void main(String[] args) throws InterruptedException {
 
         long startTime = System.nanoTime();
-        int count = 0;
-        while (count < numberOfBlocks){
+        Random rand = new Random();
 
-            Threading thread = new Threading(numberOfCityPerBlock, count);
+
+        for (int blocks = 0; blocks < numberOfBlocks; blocks++){
+            ArrayList<double[]> matrix = new ArrayList<>();
+            for (int i = 0; i < numberOfCityPerBlock; i++){
+                int xCoordinate = rand.nextInt(100);
+                int yCoordinate = rand.nextInt(100);
+                double infectionProbability = rand.nextDouble();
+
+                double[] coordinate = new double[3];
+                coordinate[0] = xCoordinate;
+                coordinate[1] = yCoordinate;
+                coordinate[2] = infectionProbability;
+
+                matrix.add(coordinate);
+            }
+            Threading thread = new Threading(matrix, numberOfCityPerBlock, blocks);
             new Thread(thread).start();
-            count ++;
+            universalMatrix.addAll(matrix);
         }
 
+        // Closing the path
         TimeUnit.SECONDS.sleep(1);
         totalTpsPath.add(totalTpsPath.get(0));
 
+        System.out.println("\nWeighted Adjacency Matrix: ");
+        printMatrix(getDistanceMatrix(universalMatrix));
+
         long endTime = System.nanoTime();
         long executionTimeForThreadedTsp3 = endTime - startTime;
+        System.out.println("\nTravelling Salesman Path: ");
         System.out.println("Total TSP: " + totalTpsPath);
         System.out.println("Total Cost: " + totaltourCost);
-        System.out.println("Total Execution time: " + executionTimeForThreadedTsp3);
+        System.out.println("Total Execution time: " + executionTimeForThreadedTsp3 + "\n");
+
+
+        ArrayList<Integer> beforeInversion = (ArrayList<Integer>) totalTpsPath.clone();
+
+        System.out.println("Handling Inversion");
+        for (int i = 0; i < totalTpsPath.size() - 3; i ++) {
+            double[] firstNodeCoordinate = new double[2];
+            double[] secondNodeCoordinate = new double[2];
+            double[] thirdNodeCoordinate = new double[2];
+            double[] fourthNodeCoordinate = new double[2];
+
+            int firstNodeIndex = i;
+            int secondNodeIndex = i+1;
+            int thirdNodeIndex = i+2;
+            int fourthNodeIndex = i+3;
+
+            int firstNode = totalTpsPath.get(firstNodeIndex);
+            int secondNode = totalTpsPath.get(secondNodeIndex);
+            int thirdNode = totalTpsPath.get(thirdNodeIndex);
+            int fourthNode = totalTpsPath.get(fourthNodeIndex);
+
+            firstNodeCoordinate[0] = universalMatrix.get(totalTpsPath.get(firstNodeIndex))[0];
+            firstNodeCoordinate[1] = universalMatrix.get(totalTpsPath.get(firstNodeIndex))[1];
+
+            secondNodeCoordinate[0] = universalMatrix.get(totalTpsPath.get(secondNodeIndex))[0];
+            secondNodeCoordinate[1] = universalMatrix.get(totalTpsPath.get(secondNodeIndex))[1];
+
+            thirdNodeCoordinate[0] = universalMatrix.get(totalTpsPath.get(thirdNodeIndex))[0];
+            thirdNodeCoordinate[1] = universalMatrix.get(totalTpsPath.get(thirdNodeIndex))[1];
+
+            fourthNodeCoordinate[0] = universalMatrix.get(totalTpsPath.get(fourthNodeIndex))[0];
+            fourthNodeCoordinate[1] = universalMatrix.get(totalTpsPath.get(fourthNodeIndex))[1];
+
+            Line2D firstLine2D = new Line2D.Float((float)firstNodeCoordinate[0], (float)firstNodeCoordinate[1], (float)secondNodeCoordinate[0], (float)secondNodeCoordinate[1]);
+            Line2D secondLine2D = new Line2D.Float((float)thirdNodeCoordinate[0], (float)thirdNodeCoordinate[1], (float)fourthNodeCoordinate[0], (float)fourthNodeCoordinate[1]);
+            boolean secondLine2DCrossFirstLine2D = secondLine2D.intersectsLine(firstLine2D);
+            if (secondLine2DCrossFirstLine2D){
+                System.out.print("Inversion required for node " +
+                        totalTpsPath.get(i) + ", node " +
+                        totalTpsPath.get(i+1) + ", node " +
+                        totalTpsPath.get(i+2) + ", and node " +
+                        totalTpsPath.get(i+3) +
+                        ":\t" +
+                        Arrays.toString(firstNodeCoordinate) + ", " +
+                        Arrays.toString(secondNodeCoordinate) + ", " +
+                        Arrays.toString(thirdNodeCoordinate) + ", " +
+                        Arrays.toString(fourthNodeCoordinate) + " and ");
+
+                totalTpsPath.set(secondNodeIndex, thirdNode);
+                totalTpsPath.set(thirdNodeIndex, secondNode);
+                System.out.println("Inversion Handled");
+            }
+
+        }
+        ArrayList<Integer> afterInversion = totalTpsPath;
+        System.out.println("\nBefore Inversion:\t" + beforeInversion);
+        System.out.println("After Inversion:\t" + afterInversion);
 
     }
 }
