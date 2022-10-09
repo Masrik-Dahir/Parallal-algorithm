@@ -133,7 +133,7 @@ public class SerialTsp {
     public static void main(String[] args) {
 
         // Create adjacency matrix
-        int n = 32;
+        int n = 25;
         double[][] distanceMatrix = new double[n][n];
         ArrayList<double[]> matrix = new ArrayList<>();
         Random rand = new Random();

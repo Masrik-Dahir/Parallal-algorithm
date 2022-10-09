@@ -100,8 +100,8 @@ public class ThreadedTsp2 {
         for (int r = 3; r <= N; r++) {
             for (int subset : combinations(r, N)) {
                 if (notIn(start, subset)) continue;
-                ExecutorService es = Executors.newCachedThreadPool();
-                es.execute(new Runnable() {
+                ExecutorService executorService = Executors.newCachedThreadPool();
+                executorService.execute(new Runnable() {
                     @Override
                     public void run() {
                         try {
@@ -127,8 +127,8 @@ public class ThreadedTsp2 {
                     }
                 });
 
-                es.shutdown();
-                boolean finished = es.awaitTermination(1, TimeUnit.MINUTES);
+                executorService.shutdown();
+                boolean finished = executorService.awaitTermination(1, TimeUnit.MINUTES);
             }
         }
 
@@ -227,7 +227,7 @@ public class ThreadedTsp2 {
     public static void main(String[] args) throws InterruptedException {
 
         // Create adjacency matrix
-        int n = 24;
+        int n = 25;
         double[][] distanceMatrix = new double[n][n];
         ArrayList<double[]> matrix = new ArrayList<>();
         Random rand = new Random();
