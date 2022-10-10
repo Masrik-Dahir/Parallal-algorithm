@@ -1,15 +1,5 @@
-/**
- * This file contains a recursive implementation of the TSP problem using dynamic programming. The
- * main idea is that since we need to do all n! permutations of nodes to find the optimal solution
- * that caching the results of sub paths can improve performance.
- *
- * <p>For example, if one permutation is: '... D A B C' then later when we need to compute the value
- * of the permutation '... E B A C' we should already have cached the answer for the subgraph
- * containing the nodes {A, B, C}.
- *
- * <p>Time Complexity: O(n^2 * 2^n) Space Complexity: O(n * 2^n)
- *
- * @author Steven & Felix Halim, William Fiset, Micah Stairs
+/*
+    java .\SerialTSP.java <number of cities
  */
 
 import java.text.DecimalFormat;
@@ -131,84 +121,88 @@ public class SerialTsp {
 
     // Example usage:
     public static void main(String[] args) {
+        if (args.length == 1){
+            // Create adjacency matrix
+            int n = Integer.parseInt(args[0]);
+            double[][] distanceMatrix = new double[n][n];
+            ArrayList<double[]> matrix = new ArrayList<>();
+            Random rand = new Random();
+            SerialTsp solver = new SerialTsp(distanceMatrix);
 
-        // Create adjacency matrix
-        int n = 25;
-        double[][] distanceMatrix = new double[n][n];
-        ArrayList<double[]> matrix = new ArrayList<>();
-        Random rand = new Random();
-        SerialTsp solver = new SerialTsp(distanceMatrix);
 
+            // Dynamic Way
+            for (int i = 0; i < n; i++){
+                int xCoordinate = rand.nextInt(100);
+                int yCoordinate = rand.nextInt(100);
+                double infectionProbability = rand.nextDouble();
 
-        // Dynamic Way
-        for (int i = 0; i < n; i++){
-//            double xCoordinate = 1 + (100 - 1) * rand.nextDouble();
-//            double yCoordinate = 1 + (100 - 1) * rand.nextDouble();
-            int xCoordinate = rand.nextInt(100);
-            int yCoordinate = rand.nextInt(100);
-            double infectionProbability = rand.nextDouble();
+                double[] coordinate = new double[3];
+                coordinate[0] = xCoordinate;
+                coordinate[1] = yCoordinate;
+                coordinate[2] = infectionProbability;
 
-            double[] coordinate = new double[3];
-            coordinate[0] = xCoordinate;
-            coordinate[1] = yCoordinate;
-            coordinate[2] = infectionProbability;
-
-            matrix.add(coordinate);
-        }
-
-        System.out.println("City Coordinates and Infection Probability (Randomly Generated):");
-        int countCoordinate = 0;
-        for(double[] i: matrix){
-            countCoordinate ++;
-            System.out.println("City " + countCoordinate + " => Coordinate: (" + i[0] + ", " + i[1] + ")\tand Infection Probability: " + df.format(i[2]));
-        }
-        System.out.println();
-
-        double maxDistance = -1;
-        double maxInfectionProbabilityMultiply = -1;
-
-        int row = 0;
-        for(double[] i: matrix){
-            int column = 0;
-            for(double[] j: matrix){
-                double distance = euclideanDistance(i[0], i[1], j[0], j[1]);
-                double infectionProbabilityMultiply = i[2]*j[2];
-
-                if (distance > maxDistance){
-                    maxDistance = distance;
-                }
-                if (infectionProbabilityMultiply > maxInfectionProbabilityMultiply){
-                    maxInfectionProbabilityMultiply = infectionProbabilityMultiply;
-                }
-                column ++;
+                matrix.add(coordinate);
             }
-            row ++;
-        }
 
-
-        row = 0;
-        for(double[] i: matrix){
-            int column = 0;
-            for(double[] j: matrix){
-
-                double distance = euclideanDistance(i[0], i[1], j[0], j[1]);
-                double infectionProbabilityMultiply = i[2]*j[2];
-
-                distanceMatrix[row][column] = (0.5*distance)/maxDistance + (0.5*infectionProbabilityMultiply)/maxInfectionProbabilityMultiply;
-                column ++;
+            System.out.println("City Coordinates and Infection Probability (Randomly Generated):");
+            int countCoordinate = 0;
+            for(double[] i: matrix){
+                countCoordinate ++;
+                System.out.println("City " + countCoordinate + " => Coordinate: (" + i[0] + ", " + i[1] + ")\tand Infection Probability: " + df.format(i[2]));
             }
-            row ++;
+            System.out.println();
+
+            double maxDistance = -1;
+            double maxInfectionProbabilityMultiply = -1;
+
+
+            int row = 0;
+            for(double[] i: matrix){
+                int column = 0;
+                for(double[] j: matrix){
+                    double distance = euclideanDistance(i[0], i[1], j[0], j[1]);
+                    double infectionProbabilityMultiply = i[2]*j[2];
+
+                    if (distance > maxDistance){
+                        maxDistance = distance;
+                    }
+                    if (infectionProbabilityMultiply > maxInfectionProbabilityMultiply){
+                        maxInfectionProbabilityMultiply = infectionProbabilityMultiply;
+                    }
+                    column ++;
+                }
+                row ++;
+            }
+
+
+            row = 0;
+            for(double[] i: matrix){
+                int column = 0;
+                for(double[] j: matrix){
+
+                    double distance = euclideanDistance(i[0], i[1], j[0], j[1]);
+                    double infectionProbabilityMultiply = i[2]*j[2];
+
+                    distanceMatrix[row][column] = (0.5*distance)/maxDistance + (0.5*infectionProbabilityMultiply)/maxInfectionProbabilityMultiply;
+                    column ++;
+                }
+                row ++;
+            }
+
+            System.out.println("Weighted Adjacency Matrix:");
+            printMatrix(distanceMatrix);
+
+            long startTime = System.nanoTime();
+            System.out.println("\nTravelling Salesman Path: ");
+            System.out.println("Tour: " + solver.getTour());
+            System.out.println("Tour cost: " + solver.getTourCost());
+            long endTime = System.nanoTime();
+            long executionTimeForSerialTsp = endTime - startTime;
+            System.out.println("Total Execution time: " + executionTimeForSerialTsp);
         }
 
-        System.out.println("Weighted Adjacency Matrix:");
-        printMatrix(distanceMatrix);
-        System.out.println();
-
-        long startTime = System.nanoTime();
-        System.out.println("Tour: " + solver.getTour());
-        System.out.println("Tour cost: " + solver.getTourCost());
-        long endTime = System.nanoTime();
-        long executionTimeForSerialTsp = endTime - startTime;
-        System.out.println("Total Execution time: " + executionTimeForSerialTsp);
+        else{
+            System.out.println("Please give an argument for number of cities. Ex - java .\\SerialTSP.java <number of cities>");
+        }
     }
 }

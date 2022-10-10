@@ -1,57 +1,28 @@
-/**
- * This file contains a recursive implementation of the TSP problem using dynamic programming. The
- * main idea is that since we need to do all n! permutations of nodes to find the optimal solution
- * that caching the results of sub paths can improve performance.
- *
- * <p>For example, if one permutation is: '... D A B C' then later when we need to compute the value
- * of the permutation '... E B A C' we should already have cached the answer for the subgraph
- * containing the nodes {A, B, C}.
- *
- * <p>Time Complexity: O(n^2 * 2^n) Space Complexity: O(n * 2^n)
- *
- * @author Steven & Felix Halim, William Fiset, Micah Stairs
+/*
+    java .\ThreadedTsp.java <number of threads> <number of cities per thread>
  */
 
+import java.awt.geom.Line2D;
 import java.text.DecimalFormat;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Random;
+import java.util.*;
+import java.util.concurrent.TimeUnit;
 
 public class ThreadedTsp {
-
     private static final DecimalFormat df = new DecimalFormat("0.00");
     private static int N = 0;
-    private static int start = 0;
-    private static double[][] distance = new double[0][];
+    static int start = 0;
+    static double[][] distance = new double[0][];
     private List<Integer> tour = new ArrayList<>();
     private double minTourCost = Double.POSITIVE_INFINITY;
     private boolean ranSolver = false;
 
     private static double newDistance;
 
-    static class Threading implements Runnable {
-        int next;
-        int subsetWithoutNext;
+    private static double totaltourCost = 0;
 
-        Double[][] memo;
-        int end;
+    static ArrayList<Integer> totalTpsPath = new ArrayList<Integer>();
 
-
-        public Threading(int next, int subsetWithoutNext, int end, Double[][] memo) {
-            // store parameter for later user
-            this.next = next;
-            this.subsetWithoutNext = subsetWithoutNext;
-            this.end = end;
-            this.memo = memo;
-        }
-
-        @Override
-        public void run() {
-            newDistance = memo[end][subsetWithoutNext] + distance[end][next];
-        }
-
-    }
+    private static ArrayList<double[]> universalMatrix = new ArrayList<>();
 
     public ThreadedTsp(double[][] distance) {
         this(0, distance);
@@ -69,13 +40,13 @@ public class ThreadedTsp {
     }
 
     // Returns the optimal tour for the traveling salesman problem.
-    public List<Integer> getTour() {
+    public List<Integer> getTour() throws InterruptedException {
         if (!ranSolver) solve();
         return tour;
     }
 
     // Returns the minimal tour cost.
-    public double getTourCost() {
+    public double getTourCost() throws InterruptedException {
         if (!ranSolver) solve();
         return minTourCost;
     }
@@ -83,9 +54,10 @@ public class ThreadedTsp {
 
     // Solves the traveling salesman problem and caches solution.
     public void solve() {
+
         if (ranSolver) return;
 
-        int END_STATE = (1 << N) - 1;
+        final int END_STATE = (1 << N) - 1;
         Double[][] memo = new Double[N][1 << N];
 
         // Add all outgoing edges from the starting node to memo table.
@@ -101,13 +73,9 @@ public class ThreadedTsp {
                     if (next == start || notIn(next, subset)) continue;
                     int subsetWithoutNext = subset ^ (1 << next);
                     double minDist = Double.POSITIVE_INFINITY;
-
                     for (int end = 0; end < N; end++) {
                         if (end == start || end == next || notIn(end, subset)) continue;
-
-                        Threading thread = new Threading(next, subsetWithoutNext, end, memo);
-                        new Thread(thread).start();
-
+                        double newDistance = memo[end][subsetWithoutNext] + distance[end][next];
                         if (newDistance < minDist) {
                             minDist = newDistance;
                         }
@@ -192,8 +160,13 @@ public class ThreadedTsp {
         }
     }
 
-    public static void printMatrix(double[][] matrix)
-    {
+    public static void printArrayList(ArrayList<double[]> matrix){
+        for (double[] i: matrix){
+            System.out.println(Arrays.toString(i));
+        }
+    }
+
+    public static void printMatrix(double[][] matrix) {
         int matrixLength =  matrix.length;
         for(int i = 0; i < matrixLength; i++) {
             for(int j = 0; j < matrixLength; j++) {
@@ -208,40 +181,50 @@ public class ThreadedTsp {
     }
 
 
-    // Example usage:
-    public static void main(String[] args) {
+    private static double[][] getDistanceMatrix (ArrayList<double[]> matrix){
+        double maxDistance = -1;
+        double maxInfectionProbabilityMultiply = -1;
+        double[][] distanceMatrix = new double[matrix.size()][matrix.size()];
 
-        // Create adjacency matrix
-        int n = 32;
-        double[][] distanceMatrix = new double[n][n];
-        ArrayList<double[]> matrix = new ArrayList<>();
-        Random rand = new Random();
-        ThreadedTsp solver = new ThreadedTsp(distanceMatrix);
-
-
-        // Dynamic Way
-        for (int i = 0; i < n; i++){
-//            double xCoordinate = 1 + (100 - 1) * rand.nextDouble();
-//            double yCoordinate = 1 + (100 - 1) * rand.nextDouble();
-            int xCoordinate = rand.nextInt(100);
-            int yCoordinate = rand.nextInt(100);
-            double infectionProbability = rand.nextDouble();
-
-            double[] coordinate = new double[3];
-            coordinate[0] = xCoordinate;
-            coordinate[1] = yCoordinate;
-            coordinate[2] = infectionProbability;
-
-            matrix.add(coordinate);
-        }
-
-        System.out.println("City Coordinates and Infection Probability (Randomly Generated):");
-        int countCoordinate = 0;
+        // Calculating maxDistance and maxInfectionProbabilityMultiply
+        int row = 0;
         for(double[] i: matrix){
-            countCoordinate ++;
-            System.out.println("City " + countCoordinate + " => Coordinate: (" + i[0] + ", " + i[1] + ")\tand Infection Probability: " + df.format(i[2]));
+            int column = 0;
+            for(double[] j: matrix){
+                double distance = euclideanDistance(i[0], i[1], j[0], j[1]);
+                double infectionProbabilityMultiply = i[2]*j[2];
+
+                if (distance > maxDistance){
+                    maxDistance = distance;
+                }
+                if (infectionProbabilityMultiply > maxInfectionProbabilityMultiply){
+                    maxInfectionProbabilityMultiply = infectionProbabilityMultiply;
+                }
+                column ++;
+            }
+            row ++;
         }
-        System.out.println();
+
+        // Calculating weight
+        row = 0;
+        for(double[] i: matrix){
+            int column = 0;
+            for(double[] j: matrix){
+
+                double distance = euclideanDistance(i[0], i[1], j[0], j[1]);
+                double infectionProbabilityMultiply = i[2]*j[2];
+
+                distanceMatrix[row][column] = (0.5*distance)/maxDistance + (0.5*infectionProbabilityMultiply)/maxInfectionProbabilityMultiply;
+                column ++;
+            }
+            row ++;
+        }
+        return distanceMatrix;
+    }
+
+    public static ArrayList<Integer> printTsp(ArrayList<double[]> matrix, int numberOfCityPerBlock, int finalCount) throws InterruptedException {
+        double[][] distanceMatrix = new double[numberOfCityPerBlock][numberOfCityPerBlock];
+        ThreadedTsp solver = new ThreadedTsp(distanceMatrix);
 
         double maxDistance = -1;
         double maxInfectionProbabilityMultiply = -1;
@@ -280,15 +263,147 @@ public class ThreadedTsp {
             row ++;
         }
 
-        System.out.println("Weighted Adjacency Matrix:");
-        printMatrix(distanceMatrix);
-        System.out.println();
+        ArrayList<Integer> blockTour = new ArrayList<>();
+        for (Integer integer: solver.getTour()){
+            blockTour.add(integer+finalCount*10);
+        }
+        blockTour.remove(blockTour.size() - 1);
+
+
+        double blockTourCost = solver.getTourCost();
+        totaltourCost += blockTourCost;
+
+        return blockTour;
+    }
+
+    static class Threading implements Runnable {
+        ArrayList<double[]> matrix;
+        int numberOfCityPerBlock;
+        int finalCount;
+
+
+        public Threading(ArrayList<double[]> matrix, int numberOfCityPerBlock, int finalCount) {
+            // store parameter for later user
+            this.matrix = matrix;
+            this.numberOfCityPerBlock = numberOfCityPerBlock;
+            this.finalCount = finalCount;
+        }
+
+        @Override
+        public void run() {
+            try {
+                ArrayList<Integer> blockTpsPath = printTsp(matrix, numberOfCityPerBlock, finalCount);
+                totalTpsPath.addAll(blockTpsPath);
+            } catch (InterruptedException e) {
+                throw new RuntimeException(e);
+            }
+        }
+
+    }
+
+    // Example usage:
+    public static void main(String[] args) throws InterruptedException {
 
         long startTime = System.nanoTime();
-        System.out.println("Tour: " + solver.getTour());
-        System.out.println("Tour cost: " + solver.getTourCost());
-        long endTime = System.nanoTime();
-        long executionTimeForThreadedTsp = endTime - startTime;
-        System.out.println("Total Execution time: " + executionTimeForThreadedTsp);
+        Random rand = new Random();
+        if (args.length == 2){
+            // Declaring number Of Blocks and number Of City Per Block
+            int numberOfBlocks = Integer.parseInt(args[0]);
+            int numberOfCityPerBlock = Integer.parseInt(args[1]);
+
+            for (int blocks = 0; blocks < numberOfBlocks; blocks++){
+                ArrayList<double[]> matrix = new ArrayList<>();
+                for (int i = 0; i < numberOfCityPerBlock; i++){
+                    int xCoordinate = rand.nextInt(100);
+                    int yCoordinate = rand.nextInt(100);
+                    double infectionProbability = rand.nextDouble();
+
+                    double[] coordinate = new double[3];
+                    coordinate[0] = xCoordinate;
+                    coordinate[1] = yCoordinate;
+                    coordinate[2] = infectionProbability;
+
+                    matrix.add(coordinate);
+                }
+                Threading thread = new Threading(matrix, numberOfCityPerBlock, blocks);
+                new Thread(thread).start();
+                universalMatrix.addAll(matrix);
+            }
+
+            // Closing the path
+            TimeUnit.SECONDS.sleep(1);
+            totalTpsPath.add(totalTpsPath.get(0));
+
+            System.out.println("\nWeighted Adjacency Matrix: ");
+            printMatrix(getDistanceMatrix(universalMatrix));
+
+            long endTime = System.nanoTime();
+            long executionTimeForThreadedTsp3 = endTime - startTime;
+            System.out.println("\nTravelling Salesman Path (Before Inversion): ");
+            System.out.println("Total TSP: " + totalTpsPath);
+            System.out.println("Total Cost: " + totaltourCost);
+            System.out.println("Total Execution time: " + executionTimeForThreadedTsp3 + "\n");
+
+
+            ArrayList<Integer> beforeInversion = (ArrayList<Integer>) totalTpsPath.clone();
+
+            System.out.println("Handling Inversion");
+            for (int i = 0; i < totalTpsPath.size() - 3; i ++) {
+                double[] firstNodeCoordinate = new double[2];
+                double[] secondNodeCoordinate = new double[2];
+                double[] thirdNodeCoordinate = new double[2];
+                double[] fourthNodeCoordinate = new double[2];
+
+                int firstNodeIndex = i;
+                int secondNodeIndex = i+1;
+                int thirdNodeIndex = i+2;
+                int fourthNodeIndex = i+3;
+
+                int firstNode = totalTpsPath.get(firstNodeIndex);
+                int secondNode = totalTpsPath.get(secondNodeIndex);
+                int thirdNode = totalTpsPath.get(thirdNodeIndex);
+                int fourthNode = totalTpsPath.get(fourthNodeIndex);
+
+                firstNodeCoordinate[0] = universalMatrix.get(totalTpsPath.get(firstNodeIndex))[0];
+                firstNodeCoordinate[1] = universalMatrix.get(totalTpsPath.get(firstNodeIndex))[1];
+
+                secondNodeCoordinate[0] = universalMatrix.get(totalTpsPath.get(secondNodeIndex))[0];
+                secondNodeCoordinate[1] = universalMatrix.get(totalTpsPath.get(secondNodeIndex))[1];
+
+                thirdNodeCoordinate[0] = universalMatrix.get(totalTpsPath.get(thirdNodeIndex))[0];
+                thirdNodeCoordinate[1] = universalMatrix.get(totalTpsPath.get(thirdNodeIndex))[1];
+
+                fourthNodeCoordinate[0] = universalMatrix.get(totalTpsPath.get(fourthNodeIndex))[0];
+                fourthNodeCoordinate[1] = universalMatrix.get(totalTpsPath.get(fourthNodeIndex))[1];
+
+                Line2D firstLine2D = new Line2D.Float((float)firstNodeCoordinate[0], (float)firstNodeCoordinate[1], (float)secondNodeCoordinate[0], (float)secondNodeCoordinate[1]);
+                Line2D secondLine2D = new Line2D.Float((float)thirdNodeCoordinate[0], (float)thirdNodeCoordinate[1], (float)fourthNodeCoordinate[0], (float)fourthNodeCoordinate[1]);
+                boolean secondLine2DCrossFirstLine2D = secondLine2D.intersectsLine(firstLine2D);
+                if (secondLine2DCrossFirstLine2D){
+                    System.out.print("Inversion required for node " +
+                            totalTpsPath.get(i) + ", node " +
+                            totalTpsPath.get(i+1) + ", node " +
+                            totalTpsPath.get(i+2) + ", and node " +
+                            totalTpsPath.get(i+3) +
+                            ":\t" +
+                            Arrays.toString(firstNodeCoordinate) + ", " +
+                            Arrays.toString(secondNodeCoordinate) + ", " +
+                            Arrays.toString(thirdNodeCoordinate) + ", " +
+                            Arrays.toString(fourthNodeCoordinate) + " and ");
+
+                    totalTpsPath.set(secondNodeIndex, thirdNode);
+                    totalTpsPath.set(thirdNodeIndex, secondNode);
+                    System.out.println("Inversion Handled");
+                }
+
+            }
+            ArrayList<Integer> afterInversion = totalTpsPath;
+            System.out.println("\nBefore Inversion:\t" + beforeInversion);
+            System.out.println("After Inversion:\t" + afterInversion);
+        }
+        else{
+            System.out.println("Please give an argument for number of cities. Ex - java .\\ThreadedTsp.java <number of threads> <number of cities per thread>");
+        }
+
     }
 }

@@ -49,8 +49,8 @@ public class ThreadedTsp3 {
         if (N != distance[0].length) throw new IllegalStateException("Matrix must be square (n x n)");
         if (start < 0 || start >= N) throw new IllegalArgumentException("Invalid start node.");
 
-        ThreadedTsp3.start = start;
-        ThreadedTsp3.distance = distance;
+        ThreadedTsp.start = start;
+        ThreadedTsp.distance = distance;
     }
 
     // Returns the optimal tour for the traveling salesman problem.
@@ -238,7 +238,7 @@ public class ThreadedTsp3 {
 
     public static ArrayList<Integer> printTsp(ArrayList<double[]> matrix, int numberOfCityPerBlock, int finalCount) throws InterruptedException {
         double[][] distanceMatrix = new double[numberOfCityPerBlock][numberOfCityPerBlock];
-        ThreadedTsp3 solver = new ThreadedTsp3(distanceMatrix);
+        ThreadedTsp solver = new ThreadedTsp(distanceMatrix);
 
         double maxDistance = -1;
         double maxInfectionProbabilityMultiply = -1;
