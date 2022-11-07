@@ -1,5 +1,5 @@
 /*
-    java .\SerialTSP.java <number of cities
+    java SerialTSP.java <number of cities
  */
 
 import java.text.DecimalFormat;
@@ -202,7 +202,7 @@ public class SerialTsp {
         }
 
         else{
-            System.out.println("Please give an argument for number of cities. Ex - java .\\SerialTSP.java <number of cities>");
+            System.out.println("Please give an argument for number of cities. Ex - java SerialTSP.java <number of cities>");
         }
     }
 }

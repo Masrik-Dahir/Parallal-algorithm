@@ -1,5 +1,5 @@
 /*
-    java .\ThreadedTsp.java <number of threads> <number of cities per thread>
+    java ThreadedTsp.java <number of threads> <number of cities per thread>
  */
 
 import java.awt.geom.Line2D;
@@ -402,7 +402,7 @@ public class ThreadedTsp {
             System.out.println("After Inversion:\t" + afterInversion);
         }
         else{
-            System.out.println("Please give an argument for number of cities. Ex - java .\\ThreadedTsp.java <number of threads> <number of cities per thread>");
+            System.out.println("Please give an argument for number of cities. Ex - java ThreadedTsp.java <number of threads> <number of cities per thread>");
         }
 
     }

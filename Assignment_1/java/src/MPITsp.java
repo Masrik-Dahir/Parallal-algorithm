@@ -22,8 +22,6 @@ public class MPITsp {
 
     static ArrayList<Integer> totalTpsPath = new ArrayList<Integer>();
 
-    static ArrayList<Integer> totalPartitionedTpsPath = new ArrayList<Integer>();
-
     private static ArrayList<double[]> universalMatrix = new ArrayList<>();
 
     public MPITsp(double[][] distance) {
@@ -182,6 +180,7 @@ public class MPITsp {
         return Math.sqrt((y2 - y1) * (y2 - y1) + (x2 - x1) * (x2 - x1));
     }
 
+
     private static double[][] getDistanceMatrix (ArrayList<double[]> matrix){
         double maxDistance = -1;
         double maxInfectionProbabilityMultiply = -1;
@@ -223,8 +222,9 @@ public class MPITsp {
         return distanceMatrix;
     }
 
-    public static double[][] getDistanceMatrix(ArrayList<double[]> matrix, int numberOfCityPerBlock){
+    public static ArrayList<Integer> printTsp(ArrayList<double[]> matrix, int numberOfCityPerBlock, int finalCount) throws InterruptedException {
         double[][] distanceMatrix = new double[numberOfCityPerBlock][numberOfCityPerBlock];
+        MPITsp solver = new MPITsp(distanceMatrix);
 
         double maxDistance = -1;
         double maxInfectionProbabilityMultiply = -1;
@@ -263,37 +263,95 @@ public class MPITsp {
             row ++;
         }
 
-        return distanceMatrix;
-    }
-
-    public static ArrayList<Integer> printTsp(ArrayList<double[]> matrix, int numberOfCityPerBlock, int finalCount) throws InterruptedException {
-        MPITsp solver = new MPITsp(getDistanceMatrix(matrix, numberOfCityPerBlock));
-
         ArrayList<Integer> blockTour = new ArrayList<>();
         for (Integer integer: solver.getTour()){
             blockTour.add(integer+finalCount*10);
         }
-
         blockTour.remove(blockTour.size() - 1);
+
+
+        double blockTourCost = solver.getTourCost();
+        totaltourCost += blockTourCost;
 
         if (finalCount == 0){
             System.out.println("(Master process): Block " + finalCount + "\t- TSP calculated " + blockTour);
-            double blockTourCost = solver.getTourCost();
-            totaltourCost += blockTourCost;
-
         }
         else{
             System.out.println("(Slave process): Block " + finalCount + "\t- TSP calculated " + blockTour + " and send to master process");
-            double blockTourCost = solver.getTourCost();
-            totaltourCost += blockTourCost;
+            // Closing the path
+            TimeUnit.SECONDS.sleep(1);
+            totalTpsPath.add(totalTpsPath.get(0));
+
+            System.out.println("\nWeighted Adjacency Matrix: ");
+            printMatrix(getDistanceMatrix(universalMatrix));
+
+
+            System.out.println("\nTravelling Salesman Path (Before Inversion): ");
+            System.out.println("Total TSP: " + totalTpsPath);
+            System.out.println("Total Cost: " + totaltourCost);
+
+
+
+            ArrayList<Integer> beforeInversion = (ArrayList<Integer>) totalTpsPath.clone();
+
+            System.out.println("Handling Inversion");
+            for (int i = 0; i < totalTpsPath.size() - 3; i ++) {
+
+                double[] firstNodeCoordinate = new double[2];
+                double[] secondNodeCoordinate = new double[2];
+                double[] thirdNodeCoordinate = new double[2];
+                double[] fourthNodeCoordinate = new double[2];
+
+                int firstNodeIndex = i;
+                int secondNodeIndex = i+1;
+                int thirdNodeIndex = i+2;
+                int fourthNodeIndex = i+3;
+
+                int firstNode = totalTpsPath.get(firstNodeIndex);
+                int secondNode = totalTpsPath.get(secondNodeIndex);
+                int thirdNode = totalTpsPath.get(thirdNodeIndex);
+                int fourthNode = totalTpsPath.get(fourthNodeIndex);
+
+                firstNodeCoordinate[0] = universalMatrix.get(totalTpsPath.get(firstNodeIndex))[0];
+                firstNodeCoordinate[1] = universalMatrix.get(totalTpsPath.get(firstNodeIndex))[1];
+
+                secondNodeCoordinate[0] = universalMatrix.get(totalTpsPath.get(secondNodeIndex))[0];
+                secondNodeCoordinate[1] = universalMatrix.get(totalTpsPath.get(secondNodeIndex))[1];
+
+                thirdNodeCoordinate[0] = universalMatrix.get(totalTpsPath.get(thirdNodeIndex))[0];
+                thirdNodeCoordinate[1] = universalMatrix.get(totalTpsPath.get(thirdNodeIndex))[1];
+
+                fourthNodeCoordinate[0] = universalMatrix.get(totalTpsPath.get(fourthNodeIndex))[0];
+                fourthNodeCoordinate[1] = universalMatrix.get(totalTpsPath.get(fourthNodeIndex))[1];
+
+                Line2D firstLine2D = new Line2D.Float((float)firstNodeCoordinate[0], (float)firstNodeCoordinate[1], (float)secondNodeCoordinate[0], (float)secondNodeCoordinate[1]);
+                Line2D secondLine2D = new Line2D.Float((float)thirdNodeCoordinate[0], (float)thirdNodeCoordinate[1], (float)fourthNodeCoordinate[0], (float)fourthNodeCoordinate[1]);
+                boolean secondLine2DCrossFirstLine2D = secondLine2D.intersectsLine(firstLine2D);
+                if (secondLine2DCrossFirstLine2D){
+                    System.out.print("Inversion required for node " +
+                            totalTpsPath.get(i) + ", node " +
+                            totalTpsPath.get(i+1) + ", node " +
+                            totalTpsPath.get(i+2) + ", and node " +
+                            totalTpsPath.get(i+3) +
+                            ":\t" +
+                            Arrays.toString(firstNodeCoordinate) + ", " +
+                            Arrays.toString(secondNodeCoordinate) + ", " +
+                            Arrays.toString(thirdNodeCoordinate) + ", " +
+                            Arrays.toString(fourthNodeCoordinate) + " and ");
+
+                    totalTpsPath.set(secondNodeIndex, thirdNode);
+                    totalTpsPath.set(thirdNodeIndex, secondNode);
+                    System.out.println("Inversion Handled");
+                }
+
+            }
+            ArrayList<Integer> afterInversion = totalTpsPath;
+            System.out.println("\nBefore Inversion:\t" + beforeInversion);
+            System.out.println("After Inversion:\t" + afterInversion);
         }
 
 
         return blockTour;
-    }
-
-    public static void stitchingAlgorithm(ArrayList<Integer> blockTpsPath){
-        totalTpsPath.addAll(blockTpsPath);
     }
 
     static class Threading implements Runnable {
@@ -313,72 +371,12 @@ public class MPITsp {
         public void run() {
             try {
                 ArrayList<Integer> blockTpsPath = printTsp(matrix, numberOfCityPerBlock, finalCount);
-
-                // Stitching Algorithm
-                System.out.println(blockTpsPath + " -> " + String.valueOf(finalCount));
-                stitchingAlgorithm(blockTpsPath);
-
+                totalTpsPath.addAll(blockTpsPath);
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
             }
         }
 
-    }
-
-    public static ArrayList<Integer> inversion(ArrayList<Integer> inversionList){
-        System.out.println("Handling Inversion");
-        for (int i = 0; i < inversionList.size() - 3; i ++) {
-
-            double[] firstNodeCoordinate = new double[2];
-            double[] secondNodeCoordinate = new double[2];
-            double[] thirdNodeCoordinate = new double[2];
-            double[] fourthNodeCoordinate = new double[2];
-
-            int firstNodeIndex = i;
-            int secondNodeIndex = i+1;
-            int thirdNodeIndex = i+2;
-            int fourthNodeIndex = i+3;
-
-            int firstNode = inversionList.get(firstNodeIndex);
-            int secondNode = inversionList.get(secondNodeIndex);
-            int thirdNode = inversionList.get(thirdNodeIndex);
-            int fourthNode = inversionList.get(fourthNodeIndex);
-
-            firstNodeCoordinate[0] = universalMatrix.get(inversionList.get(firstNodeIndex))[0];
-            firstNodeCoordinate[1] = universalMatrix.get(inversionList.get(firstNodeIndex))[1];
-
-            secondNodeCoordinate[0] = universalMatrix.get(inversionList.get(secondNodeIndex))[0];
-            secondNodeCoordinate[1] = universalMatrix.get(inversionList.get(secondNodeIndex))[1];
-
-            thirdNodeCoordinate[0] = universalMatrix.get(inversionList.get(thirdNodeIndex))[0];
-            thirdNodeCoordinate[1] = universalMatrix.get(inversionList.get(thirdNodeIndex))[1];
-
-            fourthNodeCoordinate[0] = universalMatrix.get(inversionList.get(fourthNodeIndex))[0];
-            fourthNodeCoordinate[1] = universalMatrix.get(inversionList.get(fourthNodeIndex))[1];
-
-            Line2D firstLine2D = new Line2D.Float((float)firstNodeCoordinate[0], (float)firstNodeCoordinate[1], (float)secondNodeCoordinate[0], (float)secondNodeCoordinate[1]);
-            Line2D secondLine2D = new Line2D.Float((float)thirdNodeCoordinate[0], (float)thirdNodeCoordinate[1], (float)fourthNodeCoordinate[0], (float)fourthNodeCoordinate[1]);
-            boolean secondLine2DCrossFirstLine2D = secondLine2D.intersectsLine(firstLine2D);
-            if (secondLine2DCrossFirstLine2D){
-                System.out.print("Inversion required for node " +
-                        inversionList.get(i) + ", node " +
-                        inversionList.get(i+1) + ", node " +
-                        inversionList.get(i+2) + ", and node " +
-                        inversionList.get(i+3) +
-                        ":\t" +
-                        Arrays.toString(firstNodeCoordinate) + ", " +
-                        Arrays.toString(secondNodeCoordinate) + ", " +
-                        Arrays.toString(thirdNodeCoordinate) + ", " +
-                        Arrays.toString(fourthNodeCoordinate) + " and ");
-
-                inversionList.set(secondNodeIndex, thirdNode);
-                inversionList.set(thirdNodeIndex, secondNode);
-                System.out.println("Inversion Handled");
-            }
-
-        }
-
-        return inversionList;
     }
 
     // Example usage:
@@ -393,7 +391,7 @@ public class MPITsp {
             int numberOfCityPerBlock = Integer.parseInt(args[1]);
 
             System.out.println("Processes: ");
-            for (int blocks = numberOfBlocks-1; blocks >= 0; blocks--) {
+            for (int blocks = 0; blocks < numberOfBlocks; blocks++) {
                 ArrayList<double[]> matrix = new ArrayList<>();
                 for (int i = 0; i < numberOfCityPerBlock; i++) {
                     int xCoordinate = rand.nextInt(100);
@@ -408,12 +406,10 @@ public class MPITsp {
                     matrix.add(coordinate);
                 }
 
-                System.out.println(blocks);
                 // n-1 slave Blocks
                 if (blocks != 0) {
                     Threading thread = new Threading(matrix, numberOfCityPerBlock, blocks);
                     new Thread(thread).start();
-                    universalMatrix.addAll(matrix);
                 }
 
 
@@ -421,25 +417,11 @@ public class MPITsp {
                 if (blocks == 0) {
                     Threading thread = new Threading(matrix, numberOfCityPerBlock, 0);
                     new Thread(thread).start();
-                    universalMatrix.addAll(matrix);
-
-                    // Closing the path
-                    TimeUnit.SECONDS.sleep(1);
-                    totalTpsPath.add(totalTpsPath.get(0));
-                    System.out.println("\nWeighted Adjacency Matrix: ");
-//                    printMatrix(getDistanceMatrix(universalMatrix));
-                    System.out.println("\nTravelling Salesman Path (Before Inversion): ");
-                    System.out.println("Total TSP: " + totalTpsPath);
-                    System.out.println("Total Cost: " + totaltourCost);
-                    ArrayList<Integer> beforeInversion = (ArrayList<Integer>) totalTpsPath.clone();
-                    ArrayList<Integer> inversionList = inversion(totalTpsPath);
-                    System.out.println("\nBefore Inversion:\t" + beforeInversion);
-                    System.out.println("After Inversion:\t" + inversionList);
-
                 }
 
-            }
+                universalMatrix.addAll(matrix);
 
+            }
             long endTime = System.nanoTime();
             long executionTimeForMPITsp = endTime - startTime;
             System.out.println("Total Execution time: " + executionTimeForMPITsp + "\n");
