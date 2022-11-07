@@ -306,12 +306,37 @@ public class MPITsp {
         totalTpsPath.addAll(blockTpsPath);
     }
 
-    public static ArrayList<Integer> PartitionStitchingAlgorithm(ArrayList<Integer> globalTpsPath, ArrayList<Integer> blockTpsPath, ArrayList<Integer[]> globalTpsPathMatrix, ArrayList<Integer[]> blockTpsPathMatrix){
+    public static int swapCost(int firstPointXCoordinate, int firstPointYCoordinate, int secondPointXCoordinate, int secondPointYCoordinate, 
+                               int thirdPointXCoordinate, int thirdPointYCoordinate, int fourthPointXCoordinate, int fourthPointYCoordinate){
+        // swapCost( (firstPoint, secondPoint), (thirdPoint, fourthPoint) ) = || firstPoint - fourthPoint || + || thirdPoint- secondPoint || - || firstPoint - secondPoint || - || thirdPoint - fourthPoint ||
+
+        // || firstPoint - fourthPoint ||
+        int firstPoint_fourthPoint = (int) Math.abs(euclideanDistance(firstPointXCoordinate, firstPointYCoordinate, fourthPointXCoordinate, fourthPointYCoordinate));
+
+        // || thirdPoint- secondPoint ||
+        int thirdPoint_secondPoint = (int) Math.abs(euclideanDistance(thirdPointXCoordinate, thirdPointYCoordinate, secondPointXCoordinate, secondPointYCoordinate));
+
+        // || firstPoint - secondPoint ||
+        int firstPoint_secondPoint = (int) Math.abs(euclideanDistance(firstPointXCoordinate, firstPointYCoordinate, secondPointXCoordinate, secondPointYCoordinate));
+
+        // || thirdPoint - fourthPoint ||
+        int thirdPoint_fourthPoint = (int) Math.abs(euclideanDistance(thirdPointXCoordinate, thirdPointYCoordinate, fourthPointXCoordinate, fourthPointYCoordinate));
+
+        return firstPoint_fourthPoint + thirdPoint_secondPoint - firstPoint_secondPoint - thirdPoint_fourthPoint;
+    }
+    public static ArrayList<Integer> PartitionStitchingAlgorithm(ArrayList<Integer> globalTpsPath, ArrayList<Integer> blockTpsPath){
 
         // Need to work on the algorithm
         globalTpsPath.addAll(blockTpsPath);
 
         return globalTpsPath;
+    }
+
+    public static ArrayList<Integer[]> PartitionMatrixStitchingAlgorithm(ArrayList<Integer[]> globalTpsPathMatrix, ArrayList<Integer[]> blockTpsPathMatrix){
+
+        globalTpsPathMatrix.addAll(blockTpsPathMatrix);
+
+        return globalTpsPathMatrix;
     }
 
     static class Threading implements Runnable {
@@ -343,9 +368,71 @@ public class MPITsp {
                     Integer[] n = {xCoordinate, yCoordinate};
                     coordinateArray.add(n);
                 }
-                totalPartitionedTpsPath.set(finalCount/4, PartitionStitchingAlgorithm(totalPartitionedTpsPath.get(finalCount/4), blockTpsPath, coordinateMatrix.get(finalCount/4), coordinateArray));
-                coordinateMatrix.add(coordinateArray);
 
+                ArrayList<Integer[]> localCoordinateMatrix = new ArrayList<>();
+                for (int i = 0; i < blockTpsPath.size(); i++){
+                    localCoordinateMatrix.add(coordinateArray.get(blockTpsPath.get(i)%10));
+                }
+
+                printArraylistIntegerArray(coordinateArray);
+                printArraylistIntegerArray(localCoordinateMatrix);
+
+                totalPartitionedTpsPath.set(finalCount/4, PartitionStitchingAlgorithm(totalPartitionedTpsPath.get(finalCount/4), blockTpsPath));
+                coordinateMatrix.set(finalCount/4, PartitionMatrixStitchingAlgorithm(coordinateMatrix.get(finalCount/4), localCoordinateMatrix));
+
+                if (finalCount == 4){
+                    // New
+                    ArrayList<Integer[]> globalTpsPathMatrix = coordinateMatrix.get(finalCount/4);
+                    ArrayList<Integer[]> blockTpsPathMatrix = localCoordinateMatrix;
+
+                    int minimumSwapCost = (int) Double.POSITIVE_INFINITY;
+                    Integer[][] minimumSwapCostCoordinates = new Integer[4][2];
+                    for (int i = 0; i < blockTpsPathMatrix.size() - 1; i ++){
+
+                        Integer[] firstPoint = blockTpsPathMatrix.get(i);
+                        Integer[] secondPoint = blockTpsPathMatrix.get(i+1);
+
+                        int firstPointXCoordinate = blockTpsPathMatrix.get(i)[0];
+                        int firstPointYCoordinate = blockTpsPathMatrix.get(i)[1];
+
+                        int secondPointXCoordinate = blockTpsPathMatrix.get(i+1)[0];
+                        int secondPointYCoordinate = blockTpsPathMatrix.get(i+1)[1];
+
+                        System.out.println("First Point: [" + String.valueOf(firstPointXCoordinate) + ", " + String.valueOf(firstPointYCoordinate) + "], Second Point: [" + String.valueOf(secondPointXCoordinate) + ", " + String.valueOf(secondPointYCoordinate) + "]" );
+                        System.out.println(Arrays.toString(globalTpsPathMatrix.get(19)));
+
+                        for (int j = 0; j < globalTpsPathMatrix.size() -1; j ++){
+
+                            Integer[] thirdPoint = globalTpsPathMatrix.get(j);
+                            Integer[] fourthPoint = globalTpsPathMatrix.get(j+1);
+//
+                            int thirdPointXCoordinate = globalTpsPathMatrix.get(j)[0];
+                            int thirdPointYCoordinate = globalTpsPathMatrix.get(j)[1];
+
+                            int fourthPointXCoordinate = globalTpsPathMatrix.get(j+1)[0];
+                            int fourthPointYCoordinate = globalTpsPathMatrix.get(j+1)[1];
+
+                            int swapCost = swapCost(firstPointXCoordinate, firstPointYCoordinate, secondPointXCoordinate, secondPointYCoordinate,
+                                    thirdPointXCoordinate, thirdPointYCoordinate, fourthPointXCoordinate, fourthPointYCoordinate);
+
+                            if (swapCost < minimumSwapCost){
+                                minimumSwapCost = swapCost;
+                                minimumSwapCostCoordinates[0] = firstPoint;
+                                minimumSwapCostCoordinates[1] = secondPoint;
+                                minimumSwapCostCoordinates[2] = thirdPoint;
+                                minimumSwapCostCoordinates[3] = fourthPoint;
+                            }
+                        }
+                    }
+
+                    //        More Action
+                    System.out.println("----------------------------------------------------------------");
+                    System.out.println(minimumSwapCost);
+                    printTwoDimentionalArray(minimumSwapCostCoordinates);
+                    System.out.println("----------------------------------------------------------------");
+
+
+                }
 
 
             } catch (InterruptedException e) {
@@ -353,6 +440,48 @@ public class MPITsp {
             }
         }
 
+    }
+
+    public static void printArraylistIntegerArray(ArrayList<Integer[]> old){
+        String newStr = "";
+        for (int i = 0; i < old.size(); i++){
+            Integer[] array = old.get(i);
+            for (int j = 0; j < array.length; j++){
+                if (j == 0){
+                    newStr += "[";
+                }
+                newStr += array[j] + ", ";
+                if (j == array.length-1){
+                    newStr = newStr.substring(0, newStr.length()-2);
+                    newStr += "], ";
+                }
+            }
+            if (i == old.size()-1){
+                newStr = newStr.substring(0, newStr.length()-2);
+            }
+        }
+        System.out.println(newStr);
+    }
+
+    public static void printTwoDimentionalArray(Integer[][] old){
+        String newStr = "";
+        for (int i = 0; i < old.length; i++){
+            Integer[] array = old[i];
+            for (int j = 0; j < array.length; j++){
+                if (j == 0){
+                    newStr += "[";
+                }
+                newStr += array[j] + ", ";
+                if (j == array.length-1){
+                    newStr = newStr.substring(0, newStr.length()-2);
+                    newStr += "], ";
+                }
+            }
+            if (i == old.length-1){
+                newStr = newStr.substring(0, newStr.length()-2);
+            }
+        }
+        System.out.println(newStr);
     }
 
     public static ArrayList<Integer> inversion(ArrayList<Integer> inversionList){
@@ -475,24 +604,22 @@ public class MPITsp {
 
             }
 
-//            for (int i = 0; i <= ((int) numberOfCityPerBlock/4); i++ ){
-//                PartitionStitchingAlgorithm(finalListAfterStitching, totalPartitionedTpsPath.get(i));
-//            }
-
             long endTime = System.nanoTime();
             long executionTimeForMPITsp = endTime - startTime;
             System.out.println("Total Execution time: " + executionTimeForMPITsp + "\n");
             System.out.println(finalListAfterStitching);
 
+//            Partitioned TSP Path
+            for (int i = 0; i <= ((int) numberOfCityPerBlock/4); i++ ){
+                System.out.println(totalPartitionedTpsPath.get(i));
+                System.out.println();
+            }
 
-//            for (ArrayList<Integer[]> i: coordinateMatrix){
-//                System.out.println(String.valueOf(i[0]) + ", " + String.valueOf(i[1]));
-//            }
-
-
-
-
-
+//            Partitioned Coordinates
+            for (ArrayList<Integer[]> i: coordinateMatrix){
+                printArraylistIntegerArray(i);
+                System.out.println();
+            }
 
         }
 
