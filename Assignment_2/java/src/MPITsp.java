@@ -22,7 +22,7 @@ public class MPITsp {
 
     static ArrayList<Integer> totalTpsPath = new ArrayList<Integer>();
 
-    static ArrayList<Integer> totalPartitionedTpsPath = new ArrayList<Integer>();
+    static ArrayList<ArrayList<Integer>> totalPartitionedTpsPath = new ArrayList<ArrayList<Integer>>();
 
     private static ArrayList<double[]> universalMatrix = new ArrayList<>();
 
@@ -296,6 +296,14 @@ public class MPITsp {
         totalTpsPath.addAll(blockTpsPath);
     }
 
+    public static ArrayList<Integer> PartitionStitchingAlgorithm(ArrayList<Integer> globalTpsPath, ArrayList<Integer> blockTpsPath){
+
+        // Need to work on the algorithm
+        globalTpsPath.addAll(blockTpsPath);
+
+        return globalTpsPath;
+    }
+
     static class Threading implements Runnable {
         ArrayList<double[]> matrix;
         int numberOfCityPerBlock;
@@ -315,8 +323,10 @@ public class MPITsp {
                 ArrayList<Integer> blockTpsPath = printTsp(matrix, numberOfCityPerBlock, finalCount);
 
                 // Stitching Algorithm
-                System.out.println(blockTpsPath + " -> " + String.valueOf(finalCount));
                 stitchingAlgorithm(blockTpsPath);
+
+                // Partitioned Stitching Algorithm
+                totalPartitionedTpsPath.set(finalCount/4, PartitionStitchingAlgorithm(totalPartitionedTpsPath.get(finalCount/4), blockTpsPath));
 
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
@@ -392,6 +402,10 @@ public class MPITsp {
             int numberOfBlocks = Integer.parseInt(args[0]);
             int numberOfCityPerBlock = Integer.parseInt(args[1]);
 
+            for (int i = 0; i <= ((int) numberOfCityPerBlock/4); i++ ){
+                totalPartitionedTpsPath.add(new ArrayList<Integer>());
+            }
+
             System.out.println("Processes: ");
             for (int blocks = numberOfBlocks-1; blocks >= 0; blocks--) {
                 ArrayList<double[]> matrix = new ArrayList<>();
@@ -408,7 +422,6 @@ public class MPITsp {
                     matrix.add(coordinate);
                 }
 
-                System.out.println(blocks);
                 // n-1 slave Blocks
                 if (blocks != 0) {
                     Threading thread = new Threading(matrix, numberOfCityPerBlock, blocks);
@@ -443,6 +456,7 @@ public class MPITsp {
             long endTime = System.nanoTime();
             long executionTimeForMPITsp = endTime - startTime;
             System.out.println("Total Execution time: " + executionTimeForMPITsp + "\n");
+            System.out.println(totalPartitionedTpsPath);
         }
 
 
