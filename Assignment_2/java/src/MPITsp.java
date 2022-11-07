@@ -8,6 +8,14 @@ import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 public class MPITsp {
+    public static int[][] fillMatrix(int[][] m){
+        for(int i = 0; i < m.length; i++){
+            for(int j = 0; j < m[i].length; j++){
+                m[i][j] = (int)(Math.random()*9);
+            }
+        }
+        return m;
+    }
     private static final DecimalFormat df = new DecimalFormat("0.00");
     private static int N = 0;
     private static int start = 0;
@@ -25,6 +33,8 @@ public class MPITsp {
     static ArrayList<ArrayList<Integer>> totalPartitionedTpsPath = new ArrayList<ArrayList<Integer>>();
 
     private static ArrayList<double[]> universalMatrix = new ArrayList<>();
+
+    private static ArrayList<ArrayList<Integer[]>> coordinateMatrix = new ArrayList<ArrayList<Integer[]>>();
 
     public MPITsp(double[][] distance) {
         this(0, distance);
@@ -296,7 +306,7 @@ public class MPITsp {
         totalTpsPath.addAll(blockTpsPath);
     }
 
-    public static ArrayList<Integer> PartitionStitchingAlgorithm(ArrayList<Integer> globalTpsPath, ArrayList<Integer> blockTpsPath){
+    public static ArrayList<Integer> PartitionStitchingAlgorithm(ArrayList<Integer> globalTpsPath, ArrayList<Integer> blockTpsPath, ArrayList<Integer[]> globalTpsPathMatrix, ArrayList<Integer[]> blockTpsPathMatrix){
 
         // Need to work on the algorithm
         globalTpsPath.addAll(blockTpsPath);
@@ -326,7 +336,17 @@ public class MPITsp {
                 stitchingAlgorithm(blockTpsPath);
 
                 // Partitioned Stitching Algorithm
-                totalPartitionedTpsPath.set(finalCount/4, PartitionStitchingAlgorithm(totalPartitionedTpsPath.get(finalCount/4), blockTpsPath));
+                ArrayList<Integer[]> coordinateArray = new ArrayList<>();
+                for (int i = 0; i < matrix.size(); i ++){
+                    int xCoordinate = (int) matrix.get(i)[0];
+                    int yCoordinate = (int) matrix.get(i)[1];
+                    Integer[] n = {xCoordinate, yCoordinate};
+                    coordinateArray.add(n);
+                }
+                totalPartitionedTpsPath.set(finalCount/4, PartitionStitchingAlgorithm(totalPartitionedTpsPath.get(finalCount/4), blockTpsPath, coordinateMatrix.get(finalCount/4), coordinateArray));
+                coordinateMatrix.add(coordinateArray);
+
+
 
             } catch (InterruptedException e) {
                 throw new RuntimeException(e);
@@ -396,6 +416,7 @@ public class MPITsp {
 
         long startTime = System.nanoTime();
         Random rand = new Random();
+        ArrayList<Integer> finalListAfterStitching = new ArrayList<>();
 
         if (args.length == 2) {
             // Declaring number Of Blocks and number Of City Per Block
@@ -404,6 +425,7 @@ public class MPITsp {
 
             for (int i = 0; i <= ((int) numberOfCityPerBlock/4); i++ ){
                 totalPartitionedTpsPath.add(new ArrayList<Integer>());
+                coordinateMatrix.add(new ArrayList<Integer[]>());
             }
 
             System.out.println("Processes: ");
@@ -453,15 +475,30 @@ public class MPITsp {
 
             }
 
+//            for (int i = 0; i <= ((int) numberOfCityPerBlock/4); i++ ){
+//                PartitionStitchingAlgorithm(finalListAfterStitching, totalPartitionedTpsPath.get(i));
+//            }
+
             long endTime = System.nanoTime();
             long executionTimeForMPITsp = endTime - startTime;
             System.out.println("Total Execution time: " + executionTimeForMPITsp + "\n");
-            System.out.println(totalPartitionedTpsPath);
+            System.out.println(finalListAfterStitching);
+
+
+//            for (ArrayList<Integer[]> i: coordinateMatrix){
+//                System.out.println(String.valueOf(i[0]) + ", " + String.valueOf(i[1]));
+//            }
+
+
+
+
+
+
         }
 
 
         else{
-            System.out.println("Please give an argument for number of cities. Ex - java MPITsp.java <number of blocks> <number of cities per blocks>");
+            System.out.println("Please give two arguments for number of cities. Ex - java MPITsp.java <number of blocks> <number of cities per blocks>");
         }
 
     }
