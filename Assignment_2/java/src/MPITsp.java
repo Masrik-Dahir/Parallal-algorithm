@@ -724,7 +724,7 @@ public class MPITsp {
         }
 
         else{
-            System.out.println("Please give two arguments for number of cities. Ex - java MPITsp.java <number of blocks> <number of cities per blocks>");
+            System.out.println("Please give two arguments: number of blocks and number of cities per blocks. Ex - java MPITsp.java <number of blocks> <number of cities per blocks>");
         }
 
     }
