@@ -613,7 +613,7 @@ public class MPITsp {
             int numberOfBlocks = Integer.parseInt(args[0]);
             int numberOfCityPerBlock = Integer.parseInt(args[1]);
 
-            for (int i = 0; i <= ((int) numberOfBlocks); i++ ){
+            for (int i = 0; i <= ((int) numberOfBlocks/4); i++ ){
                 totalPartitionedTpsPath.add(new ArrayList<Integer>());
                 coordinateMatrix.add(new ArrayList<Integer[]>());
             }
@@ -623,8 +623,9 @@ public class MPITsp {
                 int currentBlock = (int) blocks;
                 ArrayList<double[]> matrix = new ArrayList<>();
                 for (int i = 0; i < numberOfCityPerBlock; i++) {
-                    int xCoordinate = rand.nextInt(100);
-                    int yCoordinate = rand.nextInt(100);
+                    // Making sure the coordinate each block is within a range
+                    int xCoordinate = rand.nextInt(10*(i+1));
+                    int yCoordinate = rand.nextInt(10*(i+1));
                     double infectionProbability = rand.nextDouble();
 
                     double[] coordinate = new double[3];
