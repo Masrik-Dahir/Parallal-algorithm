@@ -1,5 +1,5 @@
 /*
-    java MPITsp.java <number of blocks> <number of cities per blocks>
+ *  java MPITsp.java <number of blocks> <number of cities per blocks>
  */
 
 import java.awt.geom.Line2D;
@@ -174,12 +174,14 @@ public class MPITsp {
         }
     }
 
+    // Print double Arraylist
     public static void printArrayList(ArrayList<double[]> matrix){
         for (double[] i: matrix){
             System.out.println(Arrays.toString(i));
         }
     }
 
+    // Print double[][]
     public static void printMatrix(double[][] matrix) {
         int matrixLength =  matrix.length;
         for(int i = 0; i < matrixLength; i++) {
@@ -190,10 +192,12 @@ public class MPITsp {
         }
     }
 
+    // Find euclideanDistance
     private static double euclideanDistance(double x1, double y1, double x2, double y2){
         return Math.sqrt((y2 - y1) * (y2 - y1) + (x2 - x1) * (x2 - x1));
     }
 
+    // calculate getDistanceMatrix from coordinate matrix
     private static double[][] getDistanceMatrix (ArrayList<double[]> matrix){
         double maxDistance = -1;
         double maxInfectionProbabilityMultiply = -1;
@@ -235,6 +239,7 @@ public class MPITsp {
         return distanceMatrix;
     }
 
+    // calculate getDistanceMatrix from coordinate matrix and umber of city per block
     public static double[][] getDistanceMatrix(ArrayList<double[]> matrix, int numberOfCityPerBlock){
         double[][] distanceMatrix = new double[numberOfCityPerBlock][numberOfCityPerBlock];
 
@@ -310,10 +315,12 @@ public class MPITsp {
         return blockTour;
     }
 
+    // Row-wise and Column-wise stitching algorithm
     public static void stitchingAlgorithm(ArrayList<Integer> blockTpsPath){
         totalTpsPath.addAll(blockTpsPath);
     }
 
+    // Finding swap cost from 4 points (8 coordinates)
     public static int swapCost(int firstPointXCoordinate, int firstPointYCoordinate, int secondPointXCoordinate, int secondPointYCoordinate, 
                                int thirdPointXCoordinate, int thirdPointYCoordinate, int fourthPointXCoordinate, int fourthPointYCoordinate){
         // swapCost( (firstPoint, secondPoint), (thirdPoint, fourthPoint) ) = || firstPoint - fourthPoint || + || thirdPoint- secondPoint || - || firstPoint - secondPoint || - || thirdPoint - fourthPoint ||
@@ -332,6 +339,8 @@ public class MPITsp {
 
         return firstPoint_fourthPoint + thirdPoint_secondPoint - firstPoint_secondPoint - thirdPoint_fourthPoint;
     }
+
+    // Partition blocks in n^2 matrix
     public static ArrayList<Integer> PartitionStitchingAlgorithm(ArrayList<Integer> globalTpsPath, ArrayList<Integer> blockTpsPath){
 
         // Need to work on the algorithm
@@ -340,6 +349,7 @@ public class MPITsp {
         return globalTpsPath;
     }
 
+    // Partition blocks in n^2 matrix with coordinates
     public static ArrayList<Integer[]> PartitionMatrixStitchingAlgorithm(ArrayList<Integer[]> globalTpsPathMatrix, ArrayList<Integer[]> blockTpsPathMatrix){
 
         globalTpsPathMatrix.addAll(blockTpsPathMatrix);
@@ -347,6 +357,7 @@ public class MPITsp {
         return globalTpsPathMatrix;
     }
 
+    // Thread for each block
     static class Threading implements Runnable {
         ArrayList<double[]> matrix;
         int numberOfCityPerBlock;
@@ -393,6 +404,7 @@ public class MPITsp {
 
     }
 
+    // finds the 4 points that produces the least swapping cost and returns it
     public static Integer[][] findCoordinates(ArrayList<Integer[]> globalTpsPathMatrix, ArrayList<Integer[]> blockTpsPathMatrix){
         int minimumSwapCost = (int) Double.POSITIVE_INFINITY;
         Integer[][] minimumSwapCostCoordinates = new Integer[4][2];
@@ -437,6 +449,7 @@ public class MPITsp {
         return minimumSwapCostCoordinates;
     }
 
+    // From the 4 points it add the two TSP with the stitching lagorithm
     public static ArrayList<Integer[]> stitchingCoordinates(ArrayList<Integer[]> globalTpsPathMatrix, ArrayList<Integer[]> blockTpsPathMatrix){
         ArrayList<Integer[]> afterStitching = new ArrayList<>();
         ArrayList<Integer> afterStitchingTsp = new ArrayList<>();
@@ -502,6 +515,7 @@ public class MPITsp {
         return afterStitching;
     }
 
+    // Print ArrayList of integer array
     public static void printArraylistIntegerArray(ArrayList<Integer[]> old, int last){
         String newStr = "";
         for (int i = 0; i < old.size(); i++){
@@ -523,6 +537,7 @@ public class MPITsp {
         System.out.println(newStr);
     }
 
+    // print 2-D array of Integers
     public static void printTwoDimentionalArray(Integer[][] old){
         String newStr = "";
         for (int i = 0; i < old.length; i++){
@@ -544,6 +559,7 @@ public class MPITsp {
         System.out.println(newStr);
     }
 
+    // Inversion Algorithm
     public static ArrayList<Integer> inversion(ArrayList<Integer> inversionList){
         System.out.println("\nHandling Inversion");
         for (int i = 0; i < inversionList.size() - 3; i ++) {
@@ -718,6 +734,7 @@ public class MPITsp {
         return a*b;
     }
 
+    // Return getPartitionedTspPath in a arrayList
     public static ArrayList<Integer> getPartitionedTspPath(ArrayList<Integer[]> old){
         ArrayList<Integer> newArrayList = new ArrayList<>();
         for (int i = 0; i < old.size(); i++){
